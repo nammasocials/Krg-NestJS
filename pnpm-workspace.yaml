@@ -1,0 +1,11 @@
+packages:
+  - web
+  - api
+
+allowBuilds:
+  sharp: false
+  unrs-resolver: false
+  "@scarf/scarf": false
+  "@parcel/watcher": false
+  mongodb-memory-server: false
+  argon2: false
