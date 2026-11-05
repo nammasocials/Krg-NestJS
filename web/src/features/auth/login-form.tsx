@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { useAuth } from "@/lib/auth/use-auth";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
+import { Spinner } from "@/components/ui/shared/spinner";
 import { Button } from "@/components/ui/shared/button";
 import { Input } from "@/components/ui/shared/input";
 import { Label } from "@/components/ui/shared/label";
@@ -128,7 +129,7 @@ export function LoginForm({ next = "/dashboard" }: { next?: string }) {
       >
         {loading ? (
           <>
-            <Loader2 className="size-5 animate-spin" aria-hidden="true" />
+            <Spinner label={null} />
             Signing in…
           </>
         ) : (

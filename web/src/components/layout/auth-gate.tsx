@@ -2,7 +2,7 @@
 
 import { useEffect, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { PageSpinner } from "@/components/ui/shared/spinner";
 import { useAuth } from "@/lib/auth/use-auth";
 import { canAccess } from "./nav/filter-nav";
 import { NAV_ITEMS } from "./nav/nav.config";
@@ -30,12 +30,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }, []);
 
   if (status !== "authenticated") {
-    return (
-      <div role="status" aria-live="polite" className="flex min-h-screen items-center justify-center bg-gray-100">
-        <Loader2 className="size-8 animate-spin text-brand-primary" aria-hidden="true" />
-        <span className="sr-only">Checking your session…</span>
-      </div>
-    );
+    return <PageSpinner fullScreen label="Checking your session…" />;
   }
 
   if (!canAccess(NAV_ITEMS, pathname, user?.role)) {

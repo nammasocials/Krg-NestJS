@@ -56,7 +56,7 @@ Status legend: ⬜ To Do · 🟦 In Progress · ✅ Done
 
 ## US03 — Shared UI feedback and error pages
 
-**Status:** 🟦 In Progress (T018 ✅ · T019 ⬜ · T020 ⬜ · T021 ⬜) — planned 2026-11-04
+**Status:** ✅ Done (T018 ✅ · T019 ✅ · T020 ✅ · T021 ✅) — planned 2026-11-04
 **Story:** As a user, I want clear loading, success/error and confirmation feedback and a friendly "page not found" page, so I am never left guessing what the app is doing.
 
 **Covered epic ACs**
@@ -71,9 +71,9 @@ Status legend: ⬜ To Do · 🟦 In Progress · ✅ Done
 | Task | Definition |
 |---|---|
 | T018 ✅ | Not-found page, error page and root error page (friendly wording, no technical details). |
-| T019 | Shared `Spinner`/`PageSpinner`, used by the session check, buttons and `(app)/loading.tsx`. |
-| T020 | Toast notifications (`useToast`: success, error, info) on `@base-ui/react`, accessible, auto-dismiss, max 3. |
-| T021 | Confirm popup (`useConfirm`, promise-based, destructive variant) on `@base-ui/react` AlertDialog. |
+| T019 ✅ | Shared `Spinner`/`PageSpinner`, used by the session check, buttons and `(app)/loading.tsx`. |
+| T020 ✅ | Toast notifications (`useToast`: success, error, info) on `@base-ui/react`, accessible, auto-dismiss, max 3. |
+| T021 ✅ | Confirm popup (`useConfirm`, promise-based, destructive variant) on `@base-ui/react` AlertDialog. |
 ---
 
 # Epic E02 — Login and Authentication
@@ -161,3 +161,82 @@ Status legend: ⬜ To Do · 🟦 In Progress · ✅ Done
 | T015 ✅ | In-memory access-token API client with 401→refresh→retry, `AuthProvider` (session bootstrap via refresh + `/auth/me`), and the login form wired to `POST /auth/login`. |
 | T016 ✅ | Route protection: `proxy.ts` redirect for `(app)` routes, redirect signed-in users from `/` and `/login` to `/dashboard`, client guard in the `(app)` layout. |
 | T017 ✅ | Logout action in header and mobile panel, real user name/role replacing the stub, and role-filtered navigation via `roles`. |
+
+---
+
+# Epic E03 — Customers
+
+*Planned 2026-11-05. Decisions to confirm are in [04-epics.md](04-epics.md#decisions-proposed-for-e03-confirm-or-change).*
+
+## US08 — Customer data and rules
+
+**Status:** ✅ Done (T022 ✅ · T023 ✅)
+**Story:** As a developer, I get the `customers` collection, GSTIN and state-code helpers, and create/validate rules, so the data is clean from the first record.
+
+**Covered epic ACs**
+- E03-AC1 — Collection and indexes by migration
+- E03-AC3 — Validation of all fields and GSTIN; derived state code; duplicate GSTIN gives 409
+
+**Tasks**
+
+| Task | Definition |
+|---|---|
+| T022 ✅ | `customers` Mongoose schema, migration with indexes, GSTIN (pattern, state code, check character) and phone helpers with unit tests. |
+| T023 ✅ | `POST /customers` with DTO validation, normalisation, derived `stateCode`, duplicate-GSTIN `409`, e2e tests. |
+
+---
+
+## US09 — Customer list, details, edit and delete API
+
+**Status:** ✅ Done (T024 ✅ · T025 ✅)
+**Story:** As a staff member, I can find a customer fast, open it, correct it and remove it, through guarded endpoints.
+
+**Covered epic ACs**
+- E03-AC2 — List with search, sort, pagination; get one
+- E03-AC4 — Soft delete frees the GSTIN
+
+**Tasks**
+
+| Task | Definition |
+|---|---|
+| T024 ✅ | `GET /customers` with search, sort, page and page size, total count; deleted customers hidden. |
+| T025 ✅ | `GET /customers/:id`, `PATCH /customers/:id` (partial edit, same rules), `DELETE /customers/:id` (soft). |
+
+---
+
+## US10 — Logo files and audit trail
+
+**Status:** ✅ Done (T026 ✅ · T027 ✅)
+**Story:** As the business owner, I want logos stored safely on disk and every customer change recorded (who, when, before and after).
+
+**Covered epic ACs**
+- E03-AC5 — Logo upload, replace, download through authorised endpoints
+- E03-AC6 — Append-only audit log for create/edit/delete
+
+**Tasks**
+
+| Task | Definition |
+|---|---|
+| T026 ✅ | `auditLogs` collection, reusable `AuditService`, wired into customer create/edit/delete (transaction-safe, secrets never logged). |
+| T027 ✅ | `fileAssets` collection, local-disk storage service (content sniffing, 5 MB limit), `PUT/GET/DELETE /customers/:id/logo`. |
+
+---
+
+## US11 — Customer screens
+
+**Status:** 🟦 In Progress (T028 ✅ · T029 ⬜ · T030 ⬜)
+**Story:** As a staff member, I want to do all of this from the Customers page on my desktop or phone.
+
+**Covered epic ACs**
+- E03-AC7 — List page
+- E03-AC8 — Add/edit form
+- E03-AC9 — Details page and delete flow
+- E03-AC10 — Tests and end-to-end verification
+
+**Tasks**
+
+| Task | Definition |
+|---|---|
+| T028 ✅ | Customers API client, list page (table/cards, search with debounce, pagination, states). |
+| T029 | Add/edit form (shared), client rules mirroring the API, field errors from the API, logo picker with preview, toasts. |
+| T030 | Details page with logo, edit link, delete with confirm popup, back to list; end-to-end check. |

@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { APP_FILTER, APP_INTERCEPTOR } from "@nestjs/core";
 import { LoggerModule } from "nestjs-pino";
+import { resolveRequestId } from "./common/request-id.middleware";
 import { HttpExceptionFilter } from "./common/http-exception.filter";
 import { ResponseInterceptor } from "./common/response.interceptor";
 import { AuthModule } from "./auth/auth.module";
@@ -9,6 +10,7 @@ import { DatabaseModule } from "./database/database.module";
 import { HealthModule } from "./health/health.module";
 import { Env, validateEnv } from "./config/env.schema";
 import { SeedModule } from "./seed/seed.module";
+import { CustomersModule } from "./customers/customers.module";
 import { UsersModule } from "./users/users.module";
 
 @Module({
@@ -17,6 +19,7 @@ import { UsersModule } from "./users/users.module";
     DatabaseModule,
     HealthModule,
     UsersModule,
+    CustomersModule,
     AuthModule,
     SeedModule,
     LoggerModule.forRootAsync({
@@ -26,6 +29,9 @@ import { UsersModule } from "./users/users.module";
         return {
           pinoHttp: {
             level: nodeEnv === "test" ? "silent" : "info",
+            // One id per request: taken from X-Request-Id when sensible; logged and stored on audit rows.
+            genReqId: (req: Parameters<typeof resolveRequestId>[0], res: Parameters<typeof resolveRequestId>[1]) =>
+              resolveRequestId(req, res),
             transport:
               nodeEnv === "development"
                 ? { target: "pino-pretty", options: { singleLine: true } }

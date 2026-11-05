@@ -2,6 +2,7 @@ import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
+import { requestIdMiddleware } from "./common/request-id.middleware";
 import type { Env } from "./config/env.schema";
 import { parseTrustProxy } from "./config/trust-proxy";
 
@@ -13,6 +14,7 @@ export function configureApp(app: INestApplication) {
   const instance = app.getHttpAdapter().getInstance() as { set(name: string, value: unknown): void };
   instance.set("trust proxy", parseTrustProxy(config.get("TRUST_PROXY", { infer: true })));
 
+  app.use(requestIdMiddleware);
   app.use(helmet());
   app.use(cookieParser());
   app.enableCors({ origin: config.get("CORS_ORIGIN", { infer: true }), credentials: true });

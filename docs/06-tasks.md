@@ -305,7 +305,7 @@ Status legend: ⬜ To Do · 🟦 In Progress · ✅ Done
 
 ---
 
-### T019 — Loading spinner and loading states  ⬜
+### T019 — Loading spinner and loading states  ✅ Done (2026-11-04)
 
 **Definition:** One shared spinner used everywhere something loads.
 
@@ -327,15 +327,23 @@ Status legend: ⬜ To Do · 🟦 In Progress · ✅ Done
 
 **Verification:** throttle the network in the browser and navigate; check the login button and session check still look the same.
 
+**Result (as built)**
+- **Files:** new `components/ui/shared/spinner.tsx` (`Spinner`, `PageSpinner`) and `app/(app)/loading.tsx`; changed `components/layout/auth-gate.tsx` and `features/auth/login-form.tsx`. No new packages.
+- **`Spinner`:** sizes `sm`/`md`/`lg`, colour from the text colour, `role="status"` with hidden text (default "Loading…"). `label={null}` gives a decorative icon with no role, used inside the sign-in button so the button's own "Signing in…" text is the announcement. Fast spin normally, a slow pulse under `prefers-reduced-motion`.
+- **`PageSpinner`:** centred in the content area (`min-h-[50vh]`, so the footer does not jump), or `fullScreen` for the session check ("Checking your session…"). `loading.tsx` shows it inside the header/footer shell while a private page streams in.
+- **Verified:** 56 web tests pass, lint and typecheck pass (no new tests: the components are markup only and Vitest runs without a DOM here). Live: the sign-in button still shows the spinner and "Signing in…" with `aria-busy`, with no nested status role; with a temporary 6-second server delay on Reports, clicking its menu item showed the spinner inside the shell (header visible, label "Loading…") and then the page content (temporary delay removed).
+- **Not verified:** the reduced-motion pulse by eye (class present, effect not observed), the full-screen session spinner frame (too short to catch), and no layout-shift measurement.
+
+
 ---
 
-### T020 — Toast notifications  ⬜
+### T020 — Toast notifications  ✅ Done (2026-11-04)
 
 **Definition:** A small, accessible way to tell the user "saved", "failed", or "heads up" from anywhere.
 
 **Acceptance criteria**
 - T020-AC1: `ToastProvider` in the root layout and a `useToast()` hook with `success(message)`, `error(message)`, `info(message)` (optional title and duration).
-- T020-AC2: Built on `@base-ui/react` Toast (already installed; no new package). Toasts appear top-right on wide screens and full width at the top on phones, never covering the header's Logout.
+- T020-AC2: Built on `@base-ui/react` Toast (already installed; no new package). Toasts appear bottom-right on wide screens and full width at the bottom on phones, so they never cover the header's user area and Logout.
 - T020-AC3: Success and info close after 5 s, errors after 8 s; hovering or focusing a toast pauses the timer; every toast has a close button; at most 3 are visible at once.
 - T020-AC4: Announced to screen readers (`aria-live` polite for success/info, assertive for errors); colour is not the only signal (icon and title too).
 - T020-AC5: Message text is plain text only (no HTML), so API error messages can be shown safely.
@@ -353,9 +361,18 @@ Status legend: ⬜ To Do · 🟦 In Progress · ✅ Done
 
 **Verification:** a temporary button on the dashboard fires each type; check timing, pause on hover, stacking, keyboard close, 360 px width; remove the button afterwards.
 
+**Result (as built)**
+- **Files:** new `components/ui/shared/toast.tsx` (`ToastProvider`, `useToast`) and `lib/ui/toast-options.ts` (+test); changed `app/layout.tsx` (provider wraps the app). Uses `@base-ui/react` Toast; no new packages.
+- **Use:** `const toast = useToast(); toast.success("Customer saved")`, also `toast.error(...)`, `toast.info(...)`, each with optional `{ title, duration }`. The message is rendered as text, so `<b>` in an API message appears literally and cannot inject markup.
+- **Behaviour:** success and info close after 5 s, errors after 8 s (`duration: 0` keeps it open); a close button on each; at most 3 visible (extra ones wait); hover and focus pause the timer (library behaviour). Errors are high priority (assertive for screen readers), the others polite; each has an icon and a title, so colour is not the only signal.
+- **Deviation:** the toasts sit at the **bottom** (full width on phones, bottom right from 640 px) instead of the top, so they can never cover the header's name and Logout button.
+- **Verified:** 60 web tests pass (4 new for the option defaults), lint and typecheck pass. Live (temporary buttons on the login page, since removed): all three types render at the bottom right with icon, title and text; `<b>` showed literally; success and info were gone about 6 s after firing and the error about 9–10 s (timer plus the exit animation); a real mouse click on × closed one toast; with four fired, three showed; at 375 px the viewport was full width with no horizontal scroll.
+- **Not verified / known:** keyboard-only close and the screen-reader announcements (not tested with a screen reader); the hover pause by hand; one early run where toasts stayed past 8 s while the browser pane was not focused (likely the library pausing timers when the window is not focused; a later run in the same state timed correctly); a clicked `.click()` from script did not close a toast, a real click did.
+
+
 ---
 
-### T021 — Confirm popup  ⬜
+### T021 — Confirm popup  ✅ Done (2026-11-05)
 
 **Definition:** An accessible "Are you sure?" dialog for destructive or irreversible actions.
 
@@ -378,6 +395,16 @@ Status legend: ⬜ To Do · 🟦 In Progress · ✅ Done
 - Changed: `web/src/app/layout.tsx` (provider)
 
 **Verification:** a temporary button opens each variant; test keyboard (Tab, Esc, Enter), focus return, and 360 px width; remove the button afterwards.
+
+**Result (as built)**
+- **Files:** new `components/ui/shared/confirm-dialog.tsx` (`ConfirmProvider`, `useConfirm`) and `lib/ui/confirm-queue.ts` (+test); changed `app/layout.tsx` (provider). Uses `@base-ui/react` AlertDialog; no new packages.
+- **Use:** `const confirm = useConfirm(); if (await confirm({ title, message, confirmLabel, cancelLabel, destructive })) { … }`. Defaults: "Confirm" and "Cancel". The promise logic is a plain controller (`createConfirmController`), separate from React.
+- **Behaviour:** Esc and Cancel answer `false`; Confirm answers `true`; a click on the backdrop does nothing. Focus moves into the dialog, stays there while tabbing, and returns to the button that opened it. Destructive: red Delete-style button and Cancel is focused first; normal: Confirm is focused. A second `confirm()` while one is open answers `false` at once and leaves the first open. Long messages wrap and scroll inside the dialog; on phones the buttons stack with Confirm on top.
+- **Verified:** 66 web tests pass (6 new for the controller), lint and typecheck pass. Live (temporary buttons on the login page, since removed): destructive dialog with a very long message showed correctly with Cancel focused; Esc gave `false` and focus went back to the opener; Confirm gave `true`; Cancel gave `false`; the normal variant focused Confirm; a second ask answered `false` while the first stayed open; a click on the backdrop left it open; Tab kept focus inside; at 375 px it showed full width with stacked buttons.
+- **Not verified:** screen-reader announcements, the Enter key on the focused button by hand, and the closing animation (none is defined, so the dialog disappears at once).
+
+**US03 and E01 are done.** E01-AC8 (not-found page) and E01-AC9 (spinner, toasts, confirm popup) are met by T018–T021.
+
 
 ---
 
@@ -832,3 +859,333 @@ Indexes: `users {username:1}` unique collation `{locale:'en',strength:2}`; `refr
 - New: `web/src/components/layout/nav/filter-nav.ts`, `filter-nav.test.ts`
 
 **Verification:** log in as admin, log out, check back button; add a temporary role-gated item to confirm filtering.
+
+---
+
+# Epic E03 — Customers
+
+*Planned 2026-11-05, not started. File lists are intended files and may be refined when each task starts. Collection rules follow [03-database-design.md](03-database-design.md) §3.3 with the changes in [04-epics.md](04-epics.md) (E03 decisions). Money and invoices are not involved. All endpoints are under `/api/v1`, need a signed-in user (T013 guard) and use the standard `{code,message,data}` envelope.*
+
+## US08 — Customer data and rules
+
+### T022 — `customers` schema, migration and GSTIN/phone helpers  ✅ Done (2026-11-05)
+
+**Definition:** The collection, its indexes, and the pure helpers that decide whether a GSTIN or phone is valid.
+
+**Acceptance criteria**
+- T022-AC1: Mongoose `Customer` schema with: `name`, `nameLower`, `email`, `phone`, `phoneAlt?`, `address { line, city, pincode }`, `gstin`, `stateCode`, `logo? { fileId, mime, size }`, `isDeleted` (default false), `deletedAt?`, `legacyId?`, timestamps, `createdBy`, `updatedBy`. `nameLower` is kept in step by the schema.
+- T022-AC2: Migration `…-create-customers.mjs` creates: partial unique `{gstin:1}` where `isDeleted:false`; `{nameLower:1}`; `{createdAt:-1}`; `{isDeleted:1}`; with a working `down`.
+- T022-AC3: `gstin.ts`: `isValidGstin(value)` checks the 15-character pattern, a real state code (table of codes in code) and the check character (mod-36 algorithm); `stateCodeOf(gstin)`; input is trimmed and upper-cased first.
+- T022-AC4: `phone.ts`: `normalizePhone(value)` accepts 10-digit Indian mobiles starting 6–9, with optional `+91`, `91` or `0` prefix and spaces/dashes, and returns the 10 digits or `null`.
+- T022-AC5: Unit tests: valid and invalid GSTINs (wrong length, bad state code, wrong check character, lower-case input), all state codes present, phone variants, schema `toJSON` shape (`id`, no `__v`, no `nameLower`).
+
+**DB collection definition — `customers`**
+
+| Field | Type | Rules |
+|---|---|---|
+| name | string | required, 2–100, trimmed |
+| nameLower | string | derived, indexed |
+| email | string | required, lower-cased |
+| phone | string | required, 10 digits |
+| phoneAlt | string | optional, 10 digits |
+| address | `{line, city, pincode}` | line ≤ 200, city ≤ 60, pincode 6 digits |
+| gstin | string | required, 15 chars, partial unique among non-deleted |
+| stateCode | string | derived from `gstin` (first two digits) |
+| logo | `{fileId, mime, size}` | optional (T027) |
+| isDeleted / deletedAt | bool / Date | soft delete |
+| legacyId | string | old `CustomerCode`, for E08 |
+| createdBy / updatedBy | ObjectId | user ids |
+
+**UI flow:** None.
+
+**API flow:** None (data layer only).
+
+**Files (intended)**
+- New: `api/src/customers/{customer.schema.ts, gstin.ts, gstin.spec.ts, phone.ts, phone.spec.ts, state-codes.ts, customers.module.ts}`
+- New: `api/migrations/<timestamp>-create-customers.mjs`
+- Changed: `api/src/app.module.ts`
+
+**Verification:** run migrations on the mock database and check the indexes; unit tests.
+
+**Result (as built)**
+- **Files:** `api/src/customers/{customer.schema.ts, customers.module.ts, gstin.ts, phone.ts, state-codes.ts}` with `gstin.spec.ts`, `phone.spec.ts` and `customers.e2e.spec.ts`; `api/migrations/20261105100000-create-customers.mjs`; `CustomersModule` added to `app.module.ts`. No new packages.
+- **Schema:** as the table above, with `address` and `logo` as sub-documents without their own ids. `toJSON` returns `id` and hides `_id` and `nameLower` (no `__v`). A `validate` hook keeps `nameLower` (from `name`) and `stateCode` (from `gstin`) in step on create and on later saves; `gstin` is trimmed and upper-cased, `email` trimmed and lower-cased by the schema. The service (T023) still normalises phones before saving; the schema only checks the 10-digit shape.
+- **Indexes (migration):** `gstin_unique_active` (unique, partial: `isDeleted:false` and `gstin` is a string), `nameLower_id` (`{nameLower:1,_id:1}`), `createdAt_id_desc` (`{createdAt:-1,_id:-1}`), `isDeleted`. The two sort indexes include `_id` because the list (T024) breaks ties on it. `down` drops the collection.
+- **GSTIN:** pattern, real state code, and the GST check character (mod-36 weighted sum). Confirmed against a real-world number (`27AAPFU0939F1ZV`) and by building numbers for several states; a mistyped character and a swap of neighbours are both caught. 38 state and territory codes; the retired codes 25 and 28 are rejected (decision to revisit if an old customer still carries one: the E08 migration skips the check).
+- **Phone:** 10-digit Indian mobile starting 6–9, optional `+91`/`91`/`0` prefix, spaces and dashes ignored; a number that merely starts with 91 is kept as it is.
+- **Verified:** 158 API tests pass in 18 suites (22 new: 8 GSTIN, 5 phone, 7 collection checks, plus 2 state-code checks); lint, typecheck and build pass. The collection tests run against the in-memory database with the real migrations and show: the indexes exist with the partial filter; derived fields; normalisation; invalid values rejected; a second active customer with the same GSTIN gets a duplicate-key error (`11000`); after a soft delete the GSTIN can be reused, and two deleted customers may share one; the migration runs twice without error, rolls back and re-applies. Built app on a persistent mock database: the migration applied once on first start and "No pending migrations" on the second.
+- **Not verified:** the migration against a real external MongoDB; the legacy rule for pincode and phone on imported data (E08).
+
+---
+
+### T023 — Create customer endpoint  ✅ Done (2026-11-05)
+
+**Definition:** `POST /customers` with full validation and clear errors.
+
+**Acceptance criteria**
+- T023-AC1: Body DTO (class-validator): `name`, `email`, `phone`, `phoneAlt?`, `address.{line,city,pincode}`, `gstin`. Unknown fields are rejected (existing pipe). Text is trimmed; email lower-cased; phones normalised; GSTIN upper-cased.
+- T023-AC2: Errors use the existing `VALIDATION_FAILED` envelope with one entry per field (`data.errors`), including a clear message for an invalid GSTIN ("Invalid GSTIN: check the number") and phone.
+- T023-AC3: `stateCode` is set from the GSTIN; the client cannot send it.
+- T023-AC4: A GSTIN already used by a non-deleted customer returns `409` with code `GSTIN_EXISTS`; the race of two simultaneous creates is settled by the unique index (the duplicate-key error is mapped to the same `409`).
+- T023-AC5: Returns `201` with the customer (`id`, fields, `createdAt`). `createdBy` is the signed-in user. Not reachable without sign-in.
+- T023-AC6: e2e tests: success, each invalid field, duplicate GSTIN, duplicate after a soft-deleted one (allowed), parallel duplicates (one `201`, one `409`), unauthenticated `401`.
+
+**DB collection definition:** `customers` (T022).
+
+**UI flow:** None yet (T029).
+
+**API flow:** `POST /api/v1/customers` → `201 {code,message,data: customer}`.
+
+**Files (intended)**
+- New: `api/src/customers/{customers.controller.ts, customers.service.ts, dto/create-customer.dto.ts, customers.e2e.spec.ts}`
+- Changed: `api/src/common/http-exception.filter.ts` (map `GSTIN_EXISTS` code if needed)
+
+**Verification:** run the API (mock) and POST valid and invalid bodies with curl.
+
+**Result (as built)**
+- **Files:** `api/src/customers/{customers.controller.ts, customers.service.ts, validators.ts, dto/create-customer.dto.ts, customers-create.e2e.spec.ts}`; changed `customers.module.ts` and `common/http-exception.filter.ts`. No new packages.
+- **Endpoint:** `POST /api/v1/customers` → `201 {code:"OK", message, data: <customer>}` (the customer itself in `data`, as the auth endpoints do, not wrapped in `{customer}`). Any signed-in user, ADMIN or SUPER_ADMIN, may call it; `createdBy` and `updatedBy` are the caller.
+- **Rules (shared with the web form later):** name 2–100 characters, letters, digits and `. , & ' ( ) / + -`, starting with a letter or digit; email valid, trimmed, lower-cased; phone and optional alternate phone via `normalizePhone` (an empty alternate phone counts as not given); address line 1–200, city 2–60 letters, pincode 6 digits not starting with 0; GSTIN trimmed, upper-cased and fully checked. `stateCode`, `isDeleted`, `createdBy`, `id` and any other unknown field are rejected with 400.
+- **Error format:** validation failures are `400 VALIDATION_FAILED` with `data.errors` as a list of messages, each starting with the field path (`gstin must be a valid GSTIN: check the number`, `address.pincode must be 6 digits and not start with 0`), all fields reported at once. The web form (T029) maps them by that prefix.
+- **Duplicate GSTIN:** `409 GSTIN_EXISTS` with `data.errors: ["gstin is already used by another customer"]`. A quick check gives the early answer; the unique index (and mapping of its duplicate-key error to the same 409) settles parallel requests: of six simultaneous creates exactly one succeeded. A soft-deleted customer's GSTIN is free again. The filter now passes an `errors` list from named errors through, so the field message reaches the client.
+- **Found by the tests and fixed:** a body without `address` caused a 500 (nested validation skips a missing object); `address` is now required with a clear message.
+- **Verified:** 191 API tests pass in 19 suites (33 new in `customers-create.e2e.spec.ts`: success, ADMIN access, normalisation, names the old system rejected, empty alternate phone, 19 invalid-field cases each naming the field, all fields at once, forbidden fields, non-object bodies, duplicates incl. lower-case input, reuse after soft delete, parallel race, 401 without or with a bad token); lint, typecheck and build pass. Built app with curl: 201 with normalised data, 409 for the duplicate, 400 with all messages, 401 without a token.
+- **Not verified:** very large bodies (the default body-size limit applies); behaviour with names in non-Latin scripts beyond the pattern (letters of any script are accepted by design).
+
+---
+
+## US09 — Customer list, details, edit and delete API
+
+### T024 — List, search, sort and paginate  ✅ Done
+
+**Definition:** `GET /customers` for the list page.
+
+**Acceptance criteria**
+- T024-AC1: Query: `page` (default 1), `pageSize` (10, 25 or 50; default 10), `q` (search), `sort` (`name`, `createdAt`; default `-createdAt`; `-` prefix = descending). Invalid values give `400`.
+- T024-AC2: `q` is matched case-insensitively against name, email, phone and GSTIN as plain text (regex characters escaped), max 100 characters.
+- T024-AC3: Response `{ items[], page, pageSize, total, totalPages }`; items carry the list fields only (`hasLogo` flag instead of logo data). Deleted customers are never returned.
+- T024-AC4: Stable ordering (tie-break on `_id`) so pages do not repeat or skip rows.
+- T024-AC5: e2e tests with seeded customers: paging, last page, search by each field, search with regex characters, sort both ways, deleted hidden, bad query `400`.
+
+**DB collection definition:** `customers`.
+
+**UI flow:** None yet (T028).
+
+**API flow:** `GET /api/v1/customers?page=1&pageSize=10&q=…&sort=name`.
+
+**Files (intended)**
+- New: `api/src/customers/dto/list-customers.query.ts`
+- Changed: `api/src/customers/{customers.controller.ts, customers.service.ts, customers.e2e.spec.ts}`
+
+**Verification:** seed 30 customers on the mock database, page and search with curl.
+
+**Result (as built)**
+- **Files:** new `api/src/customers/dto/list-customers.query.ts`, `customers-list.e2e.spec.ts`; changed `customers.controller.ts` (`@Get()`) and `customers.service.ts` (`list()`). No new packages.
+- **Endpoint:** `GET /api/v1/customers?page&pageSize&q&sort` → `200 {code:"OK", data:{ items, page, pageSize, total, totalPages }}`. Any signed-in user. `page` 1–100000 (default 1), `pageSize` 10/25/50 (default 10), `sort` one of `name`, `-name`, `createdAt`, `-createdAt` (default `-createdAt`), `q` max 100 characters. Anything else, including unknown or repeated parameters, is `400 VALIDATION_FAILED` with the messages in `data.errors`.
+- **Search:** `q` is trimmed (blank = no search) and matched as literal text, case-insensitively, anywhere in name, email, phone, alternate phone and GSTIN. A phone typed as `+91 98765-43210` or `098765 43210` is also found through `normalizePhone`.
+- **Order:** name sorts on `nameLower` (case-insensitive); `_id` breaks ties in the same direction, using the indexes from T022.
+- **Items:** `id, name, email, phone, phoneAlt?, address, gstin, stateCode, hasLogo, createdAt, updatedAt`; no logo data. A page past the end returns `items: []` with the real `total`; `totalPages` is 0 when nothing matches.
+- **Found by the tests and fixed:** a pasted phone with the +91 prefix found nobody (digits-only matching kept the country code); replaced with `normalizePhone`.
+- **Verified:** 227 API tests pass in 20 suites (36 new: auth, empty, defaults, fields, last/beyond page, page sizes, full walk, sorts, tie stability, search by each field, regex characters, trimming, deleted hidden, 14 bad queries); lint, typecheck, build pass. Built app with curl: list, phone search with +91, regex text gives 0, bad query 400, no token 401.
+- **Not verified:** speed on large collections (substring search cannot use an index; fine for the expected few thousand customers, revisit with text search if it grows); the 30-customer curl seeding was replaced by the automated tests with 23–30 rows.
+
+---
+
+### T025 — Get, edit and soft-delete  ✅ Done
+
+**Definition:** Read one customer, change it, remove it.
+
+**Acceptance criteria**
+- T025-AC1: `GET /customers/:id` returns the customer or `404`; an invalid id format gives `404` (not `500`); a deleted customer gives `404`.
+- T025-AC2: `PATCH /customers/:id` accepts any subset of the create fields with the same rules; changing `gstin` re-derives `stateCode` and re-checks uniqueness (`409` `GSTIN_EXISTS`, excluding itself); an empty body gives `400`; `updatedBy` is set.
+- T025-AC3: `DELETE /customers/:id` sets `isDeleted`, `deletedAt`; returns `204`; deleting twice gives `404`; the GSTIN can be used by a new customer afterwards.
+- T025-AC4: Edits and deletes of a deleted customer give `404`.
+- T025-AC5: e2e tests for all of the above, including `PATCH` with the customer's own unchanged GSTIN (allowed).
+
+**DB collection definition:** `customers`.
+
+**UI flow:** None yet (T029, T030).
+
+**API flow:** `GET|PATCH|DELETE /api/v1/customers/:id`.
+
+**Files (intended)**
+- New: `api/src/customers/dto/update-customer.dto.ts`, `api/src/common/parse-object-id.pipe.ts`
+- Changed: `api/src/customers/{customers.controller.ts, customers.service.ts, customers.e2e.spec.ts}`
+
+**Verification:** curl flow: create, get, patch, delete, get again.
+
+**Result (as built)**
+- **Files:** new `api/src/common/parse-object-id.pipe.ts`, `api/src/customers/dto/update-customer.dto.ts`, `api/src/customers/customers-item.e2e.spec.ts`; changed `customers.controller.ts` (`GET|PATCH|DELETE :id`) and `customers.service.ts` (`get`, `update`, `remove`). No new packages.
+- **GET `/customers/:id`:** `200` with the customer (same shape as create; `nameLower` hidden). A malformed id, an unknown id and a deleted customer all give `404 NOT_FOUND` (the id pipe runs before the body is validated).
+- **PATCH `/customers/:id`:** any subset of the create fields with the same rules and normalising (`UpdateCustomerDto` is the create DTO made optional). `address`, if sent, replaces the whole address (all three parts required). `phoneAlt` may be `null` or `""` to remove it. A changed `gstin` re-derives `stateCode` and is checked against other non-deleted customers (excluding itself) → `409 GSTIN_EXISTS`; sending the customer's own GSTIN is allowed. Empty body → `400`; forbidden fields (`stateCode`, `isDeleted`, `createdBy`, `id`, `logo`, …) → `400`. `updatedBy` is the caller.
+- **DELETE `/customers/:id`:** soft delete (`isDeleted`, `deletedAt`, `updatedBy`) → `204` with no body. The update is conditional on `isDeleted:false`, so of five parallel deletes exactly one gets `204` and four get `404`. The GSTIN can be used again immediately.
+- **Verified:** 258 API tests pass in 21 suites (31 new in `customers-item.e2e.spec.ts`); lint, typecheck, build pass. Built app with curl: create, get, patch (name and GSTIN), empty patch 400, delete 204, get after delete 404, bad id 404.
+- **Not verified / deferred:** audit rows for edit and delete are added in T026; two simultaneous edits of one customer are last-write-wins (no version check).
+
+---
+
+## US10 — Logo files and audit trail
+
+### T026 — Audit log service  ✅ Done
+
+**Definition:** An append-only record of who changed what, reusable by every module.
+
+**Acceptance criteria**
+- T026-AC1: `auditLogs` schema and migration (indexes `{entity:1, entityId:1, createdAt:-1}`, `{actorId:1, createdAt:-1}`, `{createdAt:-1}`); no update or delete method exists in the service.
+- T026-AC2: `AuditService.record({ entity, entityId, action, before, after, actorId, requestId })` computes `changedFields`, and strips secrets and file bytes (a deny-list: `passwordHash`, `tokenHash`, binary fields).
+- T026-AC3: Customer create, edit and delete each write one audit row: `CREATE` (no `before`), `UPDATE` (both, only when something changed), `DELETE` (before only). The write is in the same transaction as the change, so a failed change leaves no audit row and a saved change always has one.
+- T026-AC4: A request id (from a header or generated) is attached to every audit row and logged.
+- T026-AC5: Tests: changed-fields computation, redaction, no row for a no-op edit, rollback consistency, e2e for the three actions.
+
+**DB collection definition — `auditLogs`:** `entity`, `entityId`, `action` (`CREATE|UPDATE|DELETE|CANCEL`), `before`, `after`, `changedFields[]`, `actorId`, `requestId`, `createdAt` (append-only; see doc 03 §3.10).
+
+**UI flow:** None (a viewer screen is not in scope).
+
+**API flow:** None public.
+
+**Files (intended)**
+- New: `api/src/audit/{audit-log.schema.ts, audit.service.ts, audit.module.ts, diff.ts, diff.spec.ts}`, `api/migrations/<timestamp>-create-audit-logs.mjs`, `api/src/common/request-id.middleware.ts`
+- Changed: `api/src/customers/customers.service.ts`, `api/src/app.module.ts`
+
+**Verification:** create, edit and delete a customer and read the rows from the mock database.
+
+**Result (as built)**
+- **Files:** new `api/src/audit/{audit-log.schema.ts, audit.service.ts, audit.module.ts, diff.ts, diff.spec.ts, audit.e2e.spec.ts}`, `api/src/common/request-id.middleware.ts`, `api/migrations/20261105110000-create-audit-logs.mjs`; changed `customers.service.ts`, `customers.controller.ts`, `customers.module.ts`, `app.module.ts`, `app.setup.ts`. No new packages.
+- **Collection `auditLogs`:** `entity`, `entityId` (string), `action` (`CREATE|UPDATE|DELETE|CANCEL`), `before`, `after`, `changedFields[]`, `actorId`, `requestId`, `createdAt` (no `updatedAt`). Indexes `entity_entityId_createdAt`, `actorId_createdAt`, `createdAt_desc`. `AuditService` has one method, `record()`; there is no update or delete (a test checks this).
+- **What is stored:** snapshots are plain copies: ids and dates as strings; `passwordHash`, `tokenHash`, `__v` and any binary value are removed at any depth. `changedFields` are dotted paths (`address.city`), sorted; `updatedAt`, `updatedBy`, `createdAt`, `createdBy` and the derived `nameLower` never count as changes. A CREATE lists every field; a DELETE stores `before` only and an empty `changedFields`.
+- **Same transaction:** customer create, edit and delete each run in a Mongoose transaction together with their audit row (`record(entry, session)`). Tests make the audit write fail and confirm the customer is not created, changed or deleted; five parallel creates with one GSTIN leave one customer and one row; five parallel deletes leave one DELETE row.
+- **No-op edit:** a PATCH that sends only values the customer already has returns `200` with the customer unchanged, writes no audit row and does not touch `updatedAt`.
+- **Request id:** every response carries `X-Request-Id`; a caller's value is used only if it is 8–64 characters of letters, digits, `.`, `_`, `-`, otherwise a UUID is made. The id is the pino request id (so it appears in the request log, checked live), is read in controllers with `@RequestId()`, and is stored on each audit row.
+- **Verified:** 286 API tests pass in 23 suites (28 new: 11 diff/redaction, 17 e2e); lint, typecheck, build pass. Built app with curl: `X-Request-Id: live-check-0001` echoed in the response and found once in the log.
+- **Not verified / deferred:** there is no endpoint or screen to read the trail (out of scope; rows were checked through the database in tests); the user module's own changes (password reset, deactivate) are not audited yet; an external real MongoDB is still untested.
+
+---
+
+### T027 — File storage and logo endpoints  ✅ Done
+
+**Definition:** Safe upload, replace, download and removal of a customer logo.
+
+**Acceptance criteria**
+- T027-AC1: New settings `UPLOAD_DIR` (default `.data/uploads`, git-ignored) and `MAX_UPLOAD_MB` (default 5), documented in `.env.example` and doc 02.
+- T027-AC2: `StorageService` saves a file to `<UPLOAD_DIR>/<entity>/<2-char prefix>/<sha256>.<ext>` (a path built by the server, never from the uploaded file name), reads it back as a stream, and deletes it; path traversal is impossible.
+- T027-AC3: The type is decided by the file's first bytes (JPEG, PNG, WebP), not by the extension or the `Content-Type` header; anything else gives `415`; bigger than the limit gives `413`; an empty file gives `400`.
+- T027-AC4: `fileAssets` collection (`storageKey`, `mime`, `size`, `sha256`, `status` `PENDING|ATTACHED|ORPHANED`, `createdBy`) with migration; an upload that is saved but not attached is `PENDING`.
+- T027-AC5: `PUT /customers/:id/logo` (multipart, field `file`) stores the file, attaches it, marks any previous logo `ORPHANED`, and audits the change; `GET /customers/:id/logo` streams the file with the stored mime type, `Cache-Control: private` and `X-Content-Type-Options: nosniff`, `404` when none; `DELETE /customers/:id/logo` detaches (`204`).
+- T027-AC6: Files are not served by any static route; the API refuses requests without sign-in.
+- T027-AC7: Tests: valid JPEG/PNG/WebP, a `.png` that is really text (415), oversize (413), replace flow, download headers, traversal attempts in names, unauthenticated `401`.
+
+**DB collection definition — `fileAssets`:** doc 03 §3.9.
+
+**UI flow:** None yet (T029).
+
+**API flow:** `PUT|GET|DELETE /api/v1/customers/:id/logo`.
+
+**Files (intended)**
+- New: `api/src/files/{file-asset.schema.ts, storage.service.ts, image-sniff.ts, image-sniff.spec.ts, files.module.ts}`, `api/src/customers/customer-logo.controller.ts`, `api/migrations/<timestamp>-create-file-assets.mjs`
+- Changed: `api/src/config/env.schema.ts`, `api/.env.example`, `docs/02-tech-stack.md`, `api/package.json` (multipart support: `multer` types), `.gitignore`
+
+**Verification:** upload real and fake images with curl, download and compare bytes, check the file on disk.
+
+**Result (as built)**
+- **Files:** new `api/src/files/{file-asset.schema.ts, storage.service.ts, image-sniff.ts, image-sniff.spec.ts, storage.service.spec.ts, files.module.ts}`, `api/src/customers/{customer-logo.controller.ts, customer-logo.service.ts, customer-logo.e2e.spec.ts}`, `api/migrations/20261105120000-create-file-assets.mjs`; changed `config/env.schema.ts`, `.env.example`, `customers.module.ts`, `common/http-exception.filter.ts`, `tsconfig.json` (`multer` types), `package.json` (`@types/multer`, and the test script now runs with `--maxWorkers=4`). `.gitignore` already covered `api/.data/`.
+- **Settings:** `UPLOAD_DIR` (default `.data/uploads`) and `MAX_UPLOAD_MB` (default 5; 0.01–50).
+- **Storage:** `StorageService` keeps files at `<UPLOAD_DIR>/customers/<first 2 hex of hash>/<sha256>.<jpg|png|webp>`. The key is built from the content hash, never from the uploaded name; every key is matched against a strict pattern and checked to stay inside the upload folder (traversal keys such as `../x`, absolute and Windows paths are refused). Files are written to a temporary name and renamed, and identical content is stored once.
+- **Type check:** `sniffImage` reads the first bytes: JPEG, PNG, WebP only (SVG, GIF, PDF, HTML refused). The client's file name and `Content-Type` are ignored. Not an image → `415 UNSUPPORTED_MEDIA_TYPE`; over the limit → `413 PAYLOAD_TOO_LARGE`; empty, missing or wrongly named field → `400`. Nothing is written to disk or the database for a refused upload.
+- **`fileAssets`:** `storageKey, mime, size, sha256, status (PENDING|ATTACHED|ORPHANED), createdBy`, timestamps; indexes `status_createdAt` and `storageKey`. An upload is saved to disk and recorded `PENDING`; the transaction that attaches it to the customer marks it `ATTACHED`, marks the previous logo's asset `ORPHANED`, and writes the audit row. If that transaction fails the asset stays `PENDING` and the customer is unchanged (tested).
+- **Endpoints:** `PUT /customers/:id/logo` (multipart field `file`) → `200` with the customer; `GET` streams the file with the stored type, `Content-Length`, `Cache-Control: private, no-cache`, `X-Content-Type-Options: nosniff` and an `ETag` (the hash; a matching `If-None-Match` gives `304`); `DELETE` → `204` and detaches. `GET` and `DELETE` with no logo, and any request for an unknown, malformed or deleted customer, give `404`. All need sign-in; nothing serves the upload folder.
+- **Replace and remove keep the old file on disk.** Because identical images share one file, a file may only be deleted when no `ATTACHED` asset uses its key; the clean-up job that does this (PENDING/ORPHANED older than a threshold) is left for E08. `StorageService.delete` exists for it.
+- **Verified:** 327 API tests pass in 26 suites (41 new: sniffing, storage keys and traversal, JPEG/PNG/WebP upload, fake `.png`, oversize, empty/missing, hostile file names, replace and orphaning, same image twice, rollback leaving PENDING, headers and byte-for-byte download, 304, missing file on disk, no static route, 401s, delete, audit rows, `hasLogo` in the list); lint, typecheck, build pass. Built app with curl: real PNG stored and downloaded byte-identical with the right headers, text file 415, 6 MB 413, no token 401, delete 204 then 404.
+- **Test runner change:** with 26 suites each starting its own in-memory MongoDB, the default one-worker-per-core run (20 workers here) made four unrelated suites time out together. The `test` script now uses `--maxWorkers=4` (full run about 20 s).
+- **Not verified / deferred:** the clean-up of unused files (E08); very slow or interrupted uploads; a multipart upload through the Next.js `/api` rewrite (T029); image dimensions are not checked and files are served as uploaded (no resizing, as decided).
+
+---
+
+## US11 — Customer screens
+
+### T028 — Customers API client and list page  ✅ Done
+
+**Definition:** `/customer` shows a real, searchable, paginated list.
+
+**Acceptance criteria**
+- T028-AC1: `lib/api/customers.ts` typed functions on the existing API client (list, get, create, update, delete, logo URL); types in `features/customers/customer.types.ts`.
+- T028-AC2: Page shows a title, an "Add customer" button, a search box (debounced 300 ms, with a clear button) and the list; the search text and page live in the address bar (`?q=&page=`), so reload and Back work.
+- T028-AC3: Wide screens: table (name, GSTIN, phone, email, state, added) with row actions View, Edit, Delete. Below 768 px: one card per customer with the same actions. No horizontal page scroll from 360 px.
+- T028-AC4: Page-size selector (10/25/50), first/previous/next/last controls, "Showing 11–20 of 53".
+- T028-AC5: States: loading (shared spinner, no layout jump), empty ("No customers yet" with the add button; "No customers match …" when searching), error (message with Retry). Stale responses of an older search never overwrite a newer one.
+- T028-AC6: Delete from the list asks with the confirm popup (T021), calls the API, shows a toast and refreshes the page (or steps back one page if it was the last row).
+- T028-AC7: Unit tests for query-string building/parsing and the pagination range text.
+
+**DB collection definition:** None (uses `customers` via the API).
+
+**UI flow:** Open Customers → list → type in search → results update → change page → click Delete → confirm → toast → list refreshes.
+
+**API flow:** `GET /customers`, `DELETE /customers/:id`.
+
+**Files (intended)**
+- New: `web/src/lib/api/customers.ts`, `web/src/features/customers/{customer.types.ts, customer-list.tsx, customer-table.tsx, customer-cards.tsx, list-query.ts, list-query.test.ts, pagination.tsx}`
+- Changed: `web/src/app/(app)/customer/page.tsx`
+
+**Verification:** seed 30 customers; search, page, delete; check at 360, 768 and 1440 px; stop the API to see the error state.
+
+**Result (as built)**
+- **Files:** new `web/src/lib/api/customers.ts`, `web/src/features/customers/{customer.types.ts, list-query.ts, list-query.test.ts, format.ts, format.test.ts, state-names.ts, customer-list.tsx, customer-table.tsx, customer-cards.tsx, row-actions.tsx, pagination.tsx, search-box.tsx}`; changed `app/(app)/customer/page.tsx` and `lib/auth/auth-provider.tsx` (the auth context now also exposes `client`, the API client that holds the access token, so feature code can make requests). No new packages.
+- **API client:** `createCustomersApi(client)` gives `list(search)`, `get`, `create`, `update`, `remove`, `removeLogo`, all typed. `customerLogoPath(id)` returns the logo address, but an `<img src>` cannot send the access token, so T029/T030 will fetch logos through the client instead of using it as an image address.
+- **Address bar:** `?q=&page=&pageSize=`, only values that differ from the default (`/customer` alone is page 1, 10 rows, no search). Reading is forgiving: `page=abc`, `pageSize=7`, a 150-character `q` fall back or are cut. Typing in the search box replaces the address entry after 300 ms (one request per pause, checked); page and page-size changes add history entries, so Back and Forward step through them and the search box follows the address. A page past the end (`?page=99`) moves to the last page.
+- **Screens:** below 768 px one card per customer; 768 px and up a table (Name, GSTIN, Phone, Email, Actions; State and Added join from 1024 px; action words appear from 1024 px, icons with accessible names before that). Pagination shows "Showing 11–20 of 53", first/previous/next/last, "Page 2 of 6" and a per-page choice (10/25/50). No horizontal page scroll at 360, 768 or 1440 px (measured).
+- **States:** first load shows the shared spinner in a fixed-height box; later loads keep the old rows, faded, with a small spinner, so nothing jumps. Empty: "No customers yet." with Add customer, or "No customers match “…”." with Clear search. Error: a message with Retry (network trouble, or server trouble such as the API being down, in plain words). Each answer is stored with the address it was asked for, so a slow older answer never replaces a newer one (tested in the browser by delaying the first of two searches).
+- **Delete:** the confirm dialog (T021), then the API call, a toast, and a refresh; deleting the last row of a later page steps back one page (verified: page 2 of 25-per-page emptied row by row, address moved to page 1). A 404 (already deleted) shows an info toast and refreshes; other failures show an error toast and keep the list.
+- **Links:** View, Edit and Add customer point at `/customer/:id`, `/customer/:id/edit` and `/customer/new`, which are built in T029 and T030 (until then they show the not-found page).
+- **Verified:** 86 web tests pass (20 new: address parsing, building and round trip, API query string, range text, page after delete, formatting); lint, typecheck and production build pass. In the browser against the real API with 30 seeded customers: list, search (one request), clear, paging, page size, Back/Forward, out-of-range page, regex characters in search, empty state, delete with confirm and toast, step-back after delete, error with the API stopped, Retry, stale-answer guard, 360/768/1440 px, and sign-in redirect back to `/customer`.
+- **Not verified / deferred:** screen-reader announcements of the loading and range text; keyboard-only use of the table actions beyond tab order; the page as an ADMIN (non-super-admin) user in the browser; in `next dev` each list request is sent twice (React strict mode), which does not happen in the production build.
+
+---
+
+### T029 — Add/edit form with logo  ⬜
+
+**Definition:** One form for creating and editing a customer.
+
+**Acceptance criteria**
+- T029-AC1: Routes `/customer/new` and `/customer/[id]/edit` share `CustomerForm` (React Hook Form + zod). Fields: name, email, phone, alternate phone, address line, city, pincode, GSTIN, logo.
+- T029-AC2: Client rules match the API (name length, email, phone via the shared normaliser, pincode, GSTIN pattern + state code + check character through a copy of the same helper logic, covered by a test that runs both against one list of sample values).
+- T029-AC3: Messages appear on blur and while typing after that; the first invalid field is focused on submit; GSTIN is upper-cased as typed; the state (from the first two GSTIN digits) is shown read-only.
+- T029-AC4: API `VALIDATION_FAILED` errors and `GSTIN_EXISTS` are placed on the right field; other failures show an error toast; the submit button shows "Saving…" and cannot be double-submitted.
+- T029-AC5: Logo picker: JPEG/PNG/WebP up to 5 MB checked before upload, preview, remove; saved with `PUT /customers/:id/logo` after the customer is saved; if only the logo fails, the customer stays saved, the user is told (toast) and can retry from edit.
+- T029-AC6: Success → toast and back to the list (create) or the details page (edit). Leaving a changed form asks to confirm (T021).
+- T029-AC7: The edit form loads the customer first (spinner) and shows the shared 404 when it is missing.
+- T029-AC8: Unit tests: the zod schema against valid/invalid samples, and the API-error-to-field mapper.
+
+**DB collection definition:** None.
+
+**UI flow:** Customers → Add customer → fill → Save → toast → list shows it. Edit → change → Save → details.
+
+**API flow:** `POST /customers`, `PATCH /customers/:id`, `GET /customers/:id`, `PUT /customers/:id/logo`.
+
+**Files (intended)**
+- New: `web/src/features/customers/{customer-form.tsx, customer-schema.ts, customer-schema.test.ts, gstin.ts, map-api-errors.ts, map-api-errors.test.ts, logo-picker.tsx}`, `web/src/app/(app)/customer/new/page.tsx`, `web/src/app/(app)/customer/[id]/edit/page.tsx`
+
+**Verification:** create with and without a logo, duplicate GSTIN, invalid values, edit, change logo, cancel with unsaved changes.
+
+---
+
+### T030 — Customer details page and delete flow  ⬜
+
+**Definition:** Read-only page for one customer with the logo, and the delete action.
+
+**Acceptance criteria**
+- T030-AC1: `/customer/[id]` shows logo (or a neutral placeholder), name, email, phones, full address, GSTIN, state name and code, added and last-changed dates; layout works from 360 px.
+- T030-AC2: The logo is loaded with the signed-in request (not a public URL) and shown with a loading state; a broken or missing logo shows the placeholder.
+- T030-AC3: Buttons: Back to customers, Edit, Delete. Delete uses the confirm popup (destructive), then toast and return to the list; a failed delete shows an error toast and stays.
+- T030-AC4: An unknown or deleted id shows the shared 404 page.
+- T030-AC5: Whole-epic check: lint, typecheck, unit and e2e tests pass; the end-to-end flow (sign in → add with logo → search → view → edit → delete) is verified in the browser against the mock database; docs updated; E03 closed.
+
+**DB collection definition:** None.
+
+**UI flow:** List → View → details → Edit / Delete → list.
+
+**API flow:** `GET /customers/:id`, `GET /customers/:id/logo`, `DELETE /customers/:id`.
+
+**Files (intended)**
+- New: `web/src/features/customers/{customer-details.tsx, customer-logo.tsx}`, `web/src/app/(app)/customer/[id]/page.tsx`
+- Changed: `web/src/features/customers/customer-table.tsx` (links)
+
+**Verification:** the full walk-through above, at 360 and 1440 px.

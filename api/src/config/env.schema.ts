@@ -16,6 +16,9 @@ export const envSchema = z
     JWT_ACCESS_SECRET: z.string().min(32, "must be at least 32 characters"),
     JWT_ACCESS_TTL: z.string().regex(/^\d+[smhd]$/, "must look like 15m, 1h or 30s").default("15m"),
     REFRESH_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(7),
+    // Uploaded files live on local disk, outside any public folder. Back this up together with the database.
+    UPLOAD_DIR: z.string().min(1).default(".data/uploads"),
+    MAX_UPLOAD_MB: z.coerce.number().min(0.01).max(50).default(5),
     // Login rate limiting (in memory, single instance). Both windows are in seconds.
     LOGIN_IP_LIMIT: z.coerce.number().int().min(1).default(20),
     LOGIN_IP_WINDOW_SECONDS: z.coerce.number().int().min(1).default(60),

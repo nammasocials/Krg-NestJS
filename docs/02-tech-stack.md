@@ -93,6 +93,7 @@ One setting decides which database the API uses. Nothing else in the code knows 
 | `SEED_ADMIN_USERNAME` / `SEED_ADMIN_PASSWORD` / `SEED_ADMIN_FULL_NAME` | default `admin` / empty / `Administrator` | First admin, created only when no user exists. With an empty password a random one is printed once. |
 | `LOGIN_IP_LIMIT` / `LOGIN_IP_WINDOW_SECONDS` | defaults 20 / 60 | Login requests allowed per client IP per window (any outcome counts). |
 | `LOGIN_FAIL_LIMIT` / `LOGIN_FAIL_WINDOW_SECONDS` | defaults 5 / 900 | Login attempts allowed per username+IP per window; a successful login clears them. |
+| `UPLOAD_DIR` / `MAX_UPLOAD_MB` | defaults `.data/uploads` / 5 | Folder for uploaded files (customer logos), outside any public folder and never served statically; back it up together with the database. Largest accepted upload in MB; bigger gives 413. |
 | `TRUST_PROXY` | default `false` | Express "trust proxy" (`true`, a hop count such as `1`, or a subnet such as `loopback`). Set it behind a reverse proxy so limits apply to the real client address; leave `false` otherwise, or clients can forge `X-Forwarded-For`. |
 
 Behaviour

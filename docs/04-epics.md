@@ -19,9 +19,9 @@ Status legend: ⬜ To Do · 🟦 In Progress · ✅ Done
 
 | Epic | Title | Status | Detail level |
 |---|---|---|---|
-| E01 | Layout | ⬜ | **Detailed below** |
+| E01 | Layout | ✅ | Done: US01–US03, T001–T006, T018–T021 (2026-11-05) |
 | E02 | Login and Authentication | ✅ | Done: US04–US07, T007–T017 (2026-11-04) |
-| E03 | Customers | ⬜ | Roadmap only |
+| E03 | Customers | 🟦 | In progress: US08–US11, T022–T030; T022–T028 done |
 | E04 | Products and Units | ⬜ | Roadmap only |
 | E05 | Stock | ⬜ | Roadmap only |
 | E06 | Invoicing and GST | ⬜ | Roadmap only |
@@ -32,7 +32,7 @@ Status legend: ⬜ To Do · 🟦 In Progress · ✅ Done
 
 ## E01 — Layout
 
-**Status:** 🟦 In Progress (US01 ✅ · US02 ✅ · US03 ⬜)
+**Status:** ✅ Done (US01 ✅ · US02 ✅ · US03 ✅) — completed 2026-11-05
 
 **Description**
 Build the visual shell of the application with no business data and no API calls: the public **login layout** and the **authenticated layout** (header, navigation menu, content area, footer). Establish the web project, styling tokens and routing skeleton that every later epic builds on. Almost no database or API work is involved; the login form is UI only and is wired to the API in E02.
@@ -59,7 +59,7 @@ The existing system has a top navigation bar and a login card, but no footer and
 |---|---|---|---|
 | US01 | Login layout | E01-AC1, AC2, AC3, AC6 | ✅ |
 | US02 | Layout after login (header, menu, footer) | E01-AC4, AC5, AC6, AC7 | ✅ |
-| US03 | Shared UI feedback and error pages *(planned; tasks T018–T021)* | E01-AC8, AC9 | ⬜ |
+| US03 | Shared UI feedback and error pages *(planned; tasks T018–T021)* | E01-AC8, AC9 | ✅ |
 
 ### Descriptions
 
@@ -136,15 +136,72 @@ Make sign-in real: create the NestJS API and the first database collections (`us
 
 ---
 
+## E03 — Customers
+
+**Status:** 🟦 In Progress — approved 2026-11-05 (US08 ✅ · US09 ✅ · US10 ✅ · US11 🟦)
+
+**Description**
+Let staff manage the customers they invoice: a searchable, paginated list, a detail page, add, edit and delete (soft), a logo image, and strict GSTIN checking. Everything is built API first (collection, rules, endpoints, files, audit trail) and then the screens. Replaces the old `CustomerController`, `CustomerService` (with its LiteDB queue and cache), the SQL `InvCustomers` table and the Angular `CustomerModule`.
+
+### Acceptance Criteria (epic level)
+
+| ID | Acceptance criterion |
+|---|---|
+| E03-AC1 | The `customers` collection and its indexes exist via a migration (unique GSTIN among non-deleted customers, name search and "recently added" indexes). |
+| E03-AC2 | `GET /customers` returns a page of customers with total count, with search, sort and page size; `GET /customers/:id` returns one. Deleted customers never appear. |
+| E03-AC3 | `POST /customers` and `PATCH /customers/:id` validate name, email, phones, address, pincode and GSTIN (format, real state code, check character); `stateCode` is derived from the GSTIN; a duplicate GSTIN gives `409`. |
+| E03-AC4 | `DELETE /customers/:id` soft-deletes: the customer disappears from lists and its GSTIN can be used again. |
+| E03-AC5 | A logo (JPEG, PNG or WebP, up to 5 MB, checked by content, not by file name) can be uploaded, replaced and downloaded through authorised endpoints; files live on local disk outside any public folder. |
+| E03-AC6 | Every create, edit and delete is written to an append-only audit log with before/after and the actor (the audit service is reusable by E04–E06). |
+| E03-AC7 | `/customer` shows the list: table on wide screens, cards on phones, search box, pagination, loading, empty and error states, and Edit/View/Delete actions. |
+| E03-AC8 | Add and edit use one form with the same rules as the API, field-level API errors (for example duplicate GSTIN) shown at the field, logo preview, and success/error toasts. |
+| E03-AC9 | `/customer/:id` shows details and the logo; Delete asks for confirmation and returns to the list. |
+| E03-AC10 | Lint, typecheck, unit and e2e tests pass; the flow is verified end to end in the browser against the mock database. |
+
+### Stories
+
+| ID | Title | Covers | Status |
+|---|---|---|---|
+| US08 | Customer data and rules | E03-AC1, AC3 | ✅ |
+| US09 | Customer list, details, edit and delete API | E03-AC2, AC4 | ✅ |
+| US10 | Logo files and audit trail | E03-AC5, AC6 | ✅ |
+| US11 | Customer screens | E03-AC7, AC8, AC9, AC10 | 🟦 |
+
+### Descriptions
+
+- **US08 — Customer data and rules.** As a developer, I get the `customers` collection, GSTIN and state-code helpers, and create/validate rules, so the data is clean from the first record.
+- **US09 — Customer list, details, edit and delete API.** As a staff member, I can find a customer fast, open it, correct it and remove it, through guarded endpoints.
+- **US10 — Logo files and audit trail.** As the business owner, I want logos stored safely on disk and every customer change recorded (who, when, before and after).
+- **US11 — Customer screens.** As a staff member, I want to do all of this from the Customers page on my desktop or phone.
+
+### Tasks (simple list)
+
+- US08: T022 `customers` schema, migration and GSTIN/state helpers · T023 Create customer endpoint with validation
+- US09: T024 List, search, sort and paginate · T025 Get, edit and soft-delete endpoints
+- US10: T026 Audit log service (pulled forward from E08) · T027 File storage and logo upload/download endpoints
+- US11: T028 Customers API client and list page · T029 Add/edit form with logo · T030 Customer details page and delete flow
+
+### Decisions proposed for E03 (confirm or change)
+
+1. **Rules are cleaned up from the old UI.** Name: 2–100 characters, letters, digits and common punctuation (the old `^[A-Za-z. ]{5,50}$` rejects names like "A1 Traders & Sons"). Phones: Indian mobile, 10 digits starting 6–9, with an optional `+91`/`0` prefix accepted and stored as 10 digits (doc 03 allows a wider `+?[0-9]{8,15}`; say if you serve customers abroad). Email required, lower-cased.
+2. **GSTIN is required** (as today) and checked by pattern, valid state code and the GST check character (catches typing mistakes). Checksum is skipped by the later data migration (E08) so old rows with bad GSTINs are not lost; they are listed for cleanup.
+3. **Address is structured:** address line (required), city (required), pincode (6 digits, required) instead of one free-text string. Old addresses are split best-effort by the E08 migration.
+4. **Search** is case-insensitive "contains" over name, email, phone and GSTIN using an escaped pattern: simple and fine up to a few tens of thousands of customers; revisit with a text index if it grows.
+5. **Audit service is pulled forward into E03** (T026) so every later module is audited from the start; E08 keeps only the data-migration and reporting parts.
+6. **Logo files are stored as uploaded** (type and size checked by content, no resizing in this phase), under `UPLOAD_DIR` (default `api/.data/uploads`, git-ignored), never served statically.
+7. **Roles:** ADMIN and SUPER_ADMIN can do everything with customers (the old system had no roles). Delete is always allowed; invoices keep their own customer snapshot, so deleting never changes issued invoices.
+8. Page sizes 10 / 25 / 50, default 10, newest first unless sorted.
+
+---
+
 ## Roadmap-only epics (detailed when reached)
 
 | Epic | Scope in one line | Main data |
 |---|---|---|
-| E03 Customers | List/search/paginate, create, edit, soft-delete, logo upload, GSTIN and state validation | `customers`, `fileAssets` |
 | E04 Products and Units | Product CRUD, unit types, HSN and single GST rate, image upload | `products` (embedded stock) |
 | E05 Stock | Opening stock, stock-in, adjustments, atomic non-negative balance, stock history | `stockMovements`, `products.stock` |
 | E06 Invoicing and GST | Create invoice in one transaction, numbering, GST calculator (intra/inter-state), e-way bill upload, cancel, detail view | `invoices` (embedded items), `invoiceCounters`, `settings` |
 | E07 Dashboard and Activity | Customer/product/invoice counts, top customers, recent activity feed | `activityLogs` + aggregations |
 | E08 Hardening, Data Migration and Deployment | Audit log interceptor, SQL Server → MongoDB ETL with reconciliation, Docker, CI, secret rotation | `auditLogs`, all |
 
-> The audit interceptor can be pulled forward into E03 so every module is audited from the start; decide when E03 begins.
+> The audit service was pulled forward into E03 (T026); E08 keeps the data migration, reporting and hardening.

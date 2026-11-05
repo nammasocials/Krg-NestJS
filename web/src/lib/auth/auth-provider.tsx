@@ -1,11 +1,14 @@
 "use client";
 
 import { createContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import type { ApiClient } from "@/lib/api/client";
 import type { AuthState } from "./auth.types";
 import { setSessionHint } from "./session-hint";
 import { createSessionStore, type SessionStore } from "./session-store";
 
 export interface AuthContextValue extends AuthState {
+  /** The API client that holds the access token; feature code makes its requests through it. */
+  client: ApiClient;
   /** Resolves with a message to show, or null when signed in. */
   login: (username: string, password: string) => Promise<string | null>;
   logout: () => Promise<void>;
@@ -34,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [store]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ ...state, login: store.login, logout: store.logout }),
+    () => ({ ...state, client: store.client, login: store.login, logout: store.logout }),
     [state, store],
   );
 
