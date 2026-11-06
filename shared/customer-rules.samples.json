@@ -1,0 +1,239 @@
+{
+  "_about": "One list of sample values that both the API (api/src/customers/rules-samples.spec.ts) and the web form (web/src/features/customers/rules-samples.test.ts) are tested against, so their GSTIN and phone rules cannot drift apart.",
+  "gstin": [
+    {
+      "value": "27AAPFU0939F1ZV",
+      "valid": true
+    },
+    {
+      "value": "  27aapfu0939f1zv  ",
+      "valid": true,
+      "note": "trimmed and upper-cased first"
+    },
+    {
+      "value": "29AAPFU0939F1ZR",
+      "valid": true
+    },
+    {
+      "value": "07AAPFU1005F1ZE",
+      "valid": true
+    },
+    {
+      "value": "07AAPFU1005F1ZD",
+      "valid": false,
+      "note": "wrong check character (the right one is not D)"
+    },
+    {
+      "value": "27AAPFU0939F1ZX",
+      "valid": false,
+      "note": "wrong check character"
+    },
+    {
+      "value": "27AAPFU0939F1Z0",
+      "valid": false,
+      "note": "wrong check character"
+    },
+    {
+      "value": "",
+      "valid": false
+    },
+    {
+      "value": "27AAPFU0939F1Z",
+      "valid": false,
+      "note": "14 characters"
+    },
+    {
+      "value": "27AAPFU0939F1ZVV",
+      "valid": false,
+      "note": "16 characters"
+    },
+    {
+      "value": "27AAPFU0939F1AV",
+      "valid": false,
+      "note": "14th character must be Z"
+    },
+    {
+      "value": "27AAPF10939F1ZV",
+      "valid": false,
+      "note": "digit where a PAN letter belongs"
+    },
+    {
+      "value": "27AAPFU0939F0ZV",
+      "valid": false,
+      "note": "entity number cannot be 0"
+    },
+    {
+      "value": "25AAPFU0939F1ZV",
+      "valid": false,
+      "note": "state code 25 does not exist"
+    },
+    {
+      "value": "00AAPFU0939F1ZV",
+      "valid": false,
+      "note": "state code 00 does not exist"
+    },
+    {
+      "value": "27 AAPFU0939F1ZV",
+      "valid": false,
+      "note": "inner space"
+    },
+    {
+      "value": "27AAPFU0939F1Z-",
+      "valid": false,
+      "note": "symbol"
+    }
+  ],
+  "phone": [
+    {
+      "input": "9876543210",
+      "normalized": "9876543210"
+    },
+    {
+      "input": "  9876543210  ",
+      "normalized": "9876543210"
+    },
+    {
+      "input": "+91 98765 43210",
+      "normalized": "9876543210"
+    },
+    {
+      "input": "+919876543210",
+      "normalized": "9876543210"
+    },
+    {
+      "input": "91-98765-43210",
+      "normalized": "9876543210"
+    },
+    {
+      "input": "09876543210",
+      "normalized": "9876543210"
+    },
+    {
+      "input": "6000000000",
+      "normalized": "6000000000"
+    },
+    {
+      "input": "5876543210",
+      "normalized": null,
+      "note": "must start 6-9"
+    },
+    {
+      "input": "987654321",
+      "normalized": null,
+      "note": "9 digits"
+    },
+    {
+      "input": "98765432100",
+      "normalized": null,
+      "note": "11 digits"
+    },
+    {
+      "input": "+1 9876543210",
+      "normalized": null
+    },
+    {
+      "input": "98765 4321a",
+      "normalized": null
+    },
+    {
+      "input": "",
+      "normalized": null
+    },
+    {
+      "input": "abcdefghij",
+      "normalized": null
+    }
+  ],
+  "name": [
+    {
+      "value": "Sri Lakshmi Traders",
+      "valid": true
+    },
+    {
+      "value": "Blue Star (India) & Co.",
+      "valid": true
+    },
+    {
+      "value": "A1 Traders",
+      "valid": true
+    },
+    {
+      "value": "M/s Rao + Sons",
+      "valid": true
+    },
+    {
+      "value": "L'Oréal India",
+      "valid": true
+    },
+    {
+      "value": "श्री गणेश",
+      "valid": true,
+      "note": "Devanagari vowel signs are combining marks"
+    },
+    {
+      "value": "ராம் ஸ்டோர்ஸ்",
+      "valid": true,
+      "note": "Tamil"
+    },
+    {
+      "value": "ಕಾವೇರಿ ಏಜೆನ್ಸೀಸ್",
+      "valid": true,
+      "note": "Kannada"
+    },
+    {
+      "value": "-Acme",
+      "valid": false,
+      "note": "must start with a letter or digit"
+    },
+    {
+      "value": "Acme @ Home",
+      "valid": false
+    },
+    {
+      "value": "Acme_Co",
+      "valid": false
+    }
+  ],
+  "city": [
+    {
+      "value": "Mysuru",
+      "valid": true
+    },
+    {
+      "value": "New Delhi",
+      "valid": true
+    },
+    {
+      "value": "St. Thomas Mount",
+      "valid": true
+    },
+    {
+      "value": "Kolkata-West",
+      "valid": true
+    },
+    {
+      "value": "मुंबई",
+      "valid": true
+    },
+    {
+      "value": "ಮೈಸೂರು",
+      "valid": true
+    },
+    {
+      "value": "Mysuru1",
+      "valid": false
+    },
+    {
+      "value": "1Mysuru",
+      "valid": false
+    },
+    {
+      "value": "-Mysuru",
+      "valid": false
+    },
+    {
+      "value": "Mys@ru",
+      "valid": false
+    }
+  ]
+}

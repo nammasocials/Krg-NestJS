@@ -13,8 +13,9 @@ const phoneDigits = ({ value }: { value: unknown }) =>
 const gstin = ({ value }: { value: unknown }) => (typeof value === "string" ? normalizeGstin(value) : value);
 
 /** Letters, digits and common punctuation; starts with a letter or digit. */
-export const NAME_PATTERN = /^[\p{L}\p{N}][\p{L}\p{N} .,&'()/+-]*$/u;
-export const CITY_PATTERN = /^[\p{L}][\p{L} .'-]*$/u;
+// \p{M} (combining marks) is needed for names in scripts such as Devanagari, Tamil or Kannada.
+export const NAME_PATTERN = /^[\p{L}\p{N}][\p{L}\p{M}\p{N} .,&'()/+-]*$/u;
+export const CITY_PATTERN = /^[\p{L}][\p{L}\p{M} .'-]*$/u;
 export const PINCODE_PATTERN = /^[1-9][0-9]{5}$/;
 
 export class AddressDto {

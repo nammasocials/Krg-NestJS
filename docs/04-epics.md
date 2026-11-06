@@ -21,8 +21,8 @@ Status legend: ⬜ To Do · 🟦 In Progress · ✅ Done
 |---|---|---|---|
 | E01 | Layout | ✅ | Done: US01–US03, T001–T006, T018–T021 (2026-11-05) |
 | E02 | Login and Authentication | ✅ | Done: US04–US07, T007–T017 (2026-11-04) |
-| E03 | Customers | 🟦 | In progress: US08–US11, T022–T030; T022–T028 done |
-| E04 | Products and Units | ⬜ | Roadmap only |
+| E03 | Customers | ✅ | Done: US08–US11, T022–T030 (2026-11-06) |
+| E04 | Products and Units | 🟦 | In progress: US12–US15, T031–T038; T031–T033 done |
 | E05 | Stock | ⬜ | Roadmap only |
 | E06 | Invoicing and GST | ⬜ | Roadmap only |
 | E07 | Dashboard and Activity | ⬜ | Roadmap only |
@@ -138,7 +138,7 @@ Make sign-in real: create the NestJS API and the first database collections (`us
 
 ## E03 — Customers
 
-**Status:** 🟦 In Progress — approved 2026-11-05 (US08 ✅ · US09 ✅ · US10 ✅ · US11 🟦)
+**Status:** ✅ Done — approved 2026-11-05, closed 2026-11-06 (US08 ✅ · US09 ✅ · US10 ✅ · US11 ✅)
 
 **Description**
 Let staff manage the customers they invoice: a searchable, paginated list, a detail page, add, edit and delete (soft), a logo image, and strict GSTIN checking. Everything is built API first (collection, rules, endpoints, files, audit trail) and then the screens. Replaces the old `CustomerController`, `CustomerService` (with its LiteDB queue and cache), the SQL `InvCustomers` table and the Angular `CustomerModule`.
@@ -165,7 +165,7 @@ Let staff manage the customers they invoice: a searchable, paginated list, a det
 | US08 | Customer data and rules | E03-AC1, AC3 | ✅ |
 | US09 | Customer list, details, edit and delete API | E03-AC2, AC4 | ✅ |
 | US10 | Logo files and audit trail | E03-AC5, AC6 | ✅ |
-| US11 | Customer screens | E03-AC7, AC8, AC9, AC10 | 🟦 |
+| US11 | Customer screens | E03-AC7, AC8, AC9, AC10 | ✅ |
 
 ### Descriptions
 
@@ -194,11 +194,68 @@ Let staff manage the customers they invoice: a searchable, paginated list, a det
 
 ---
 
+## E04 — Products and Units
+
+**Status:** 🟦 In Progress — decisions approved 2026-11-06 (US12 ✅ · US13 🟦 · US14 ⬜ · US15 ⬜)
+
+**Description**
+Let staff manage the products they sell: a searchable, paginated list, a detail page, add, edit and delete (soft), a product image, unit type (piece or pack), HSN code and one GST rate. Built like E03 (API first, then screens) and reusing its audit service, file storage and list/form patterns. Replaces the old `ProductController`, `ProductService`, the SQL `InvProducts` table and the `InvConstant` unit types, and the Angular `ProductModule` (its stock screens belong to E05).
+
+### Acceptance Criteria (epic level)
+
+| ID | Acceptance criterion |
+|---|---|
+| E04-AC1 | The `products` collection and its indexes exist via a migration (unique name among non-deleted products, name search and "recently added" indexes). |
+| E04-AC2 | `GET /products` returns a page with total count, search, sort and page size (and an optional active-only filter); `GET /products/:id` returns one. Deleted products never appear. |
+| E04-AC3 | `POST /products` and `PATCH /products/:id` validate name, unit, unit price (paise, ≥ 0), HSN code and GST rate (from the allowed set); a duplicate name gives `409`. `stock.qtyOnHand` can never be set through these endpoints. |
+| E04-AC4 | `DELETE /products/:id` soft-deletes: the product disappears from lists and its name can be used again. A product can also be switched inactive (kept, but not offered for new invoices). |
+| E04-AC5 | A product image (JPEG, PNG or WebP, up to 5 MB, checked by content) can be uploaded, replaced, downloaded and removed through authorised endpoints, using the same file storage as customer logos. |
+| E04-AC6 | Every create, edit, delete and active/inactive change is written to the audit log. |
+| E04-AC7 | `/product` shows the list: table on wide screens, cards on phones, search, pagination, loading/empty/error states, stock shown read-only, and View/Edit/Delete actions. |
+| E04-AC8 | Add and edit use one form with the same rules as the API, field-level API errors, image preview, a live price-with-GST preview, and success/error toasts. |
+| E04-AC9 | `/product/:id` shows details and the image; Delete asks for confirmation and returns to the list. |
+| E04-AC10 | Lint, typecheck, unit and e2e tests pass; the flow is verified end to end in the browser against the mock database. |
+
+### Stories
+
+| ID | Title | Covers | Status |
+|---|---|---|---|
+| US12 | Product data and rules | E04-AC1, AC3 | ✅ |
+| US13 | Product list, details, edit and delete API | E04-AC2, AC4, AC6 | 🟦 |
+| US14 | Product image | E04-AC5 | ⬜ |
+| US15 | Product screens | E04-AC7, AC8, AC9, AC10 | ⬜ |
+
+### Descriptions
+
+- **US12 — Product data and rules.** As a developer, I get the `products` collection and the unit and GST rules, so prices and tax data are clean from the first record.
+- **US13 — Product list, details, edit and delete API.** As a staff member, I can find a product, open it, correct it, deactivate it and remove it, through guarded and audited endpoints.
+- **US14 — Product image.** As a staff member, I can give a product a picture, stored safely on disk like customer logos.
+- **US15 — Product screens.** As a staff member, I want to do all of this from the Products page on my desktop or phone.
+
+### Tasks (simple list)
+
+- US12: T031 `products` schema, migration, unit and GST-rate helpers · T032 Create product endpoint with validation
+- US13: T033 List, search, sort and paginate · T034 Get, edit, activate/deactivate and soft-delete endpoints (audited)
+- US14: T035 Product image upload/download endpoints (shared file storage)
+- US15: T036 Products API client and list page · T037 Add/edit form with image and GST preview · T038 Product details page, delete flow and whole-epic check
+
+### Decisions proposed for E04 (confirm or change)
+
+1. **One GST rate per product** (`gstRate`, from 0, 0.25, 3, 5, 12, 18, 28). The old system stored CGST and SGST separately; intra-state invoices split the rate in two halves and inter-state invoices charge it whole as IGST (E06). If any existing product has CGST ≠ SGST, say so now (open question 1 in doc 03); the E08 migration reports such rows rather than guessing.
+2. **Money in paise** (integer): the form takes rupees with up to 2 decimals and the API stores and returns `unitPrice` in paise. The list and details show ₹ with 2 decimals. The old "net cost" is shown as a read-only "price including GST" preview only; it is never stored.
+3. **Units:** `PIECE` and `PACK` (a pack is 10 pieces, as in the old constants), as a fixed list in code instead of a constants table. Adding a unit later is a code change.
+4. **Stock is not edited here.** A new product starts at 0 on hand; the old "current stock" box on the add form is replaced by the opening-stock and stock-in screens in E05 (so stock only ever changes through the stock service, with a history row). The list and details show the quantity read-only.
+5. **Rules cleaned up from the old UI:** name 2–100 characters, letters, digits and common punctuation (the old `^[A-Za-z. ]{5,50}$` rejects "Bag 25kg"), unique among active products, case-insensitive; HSN 4, 6 or 8 digits; price ≥ 0 (a zero price is allowed, for free items).
+6. **Inactive vs deleted:** inactive products stay in lists (marked) and keep their history but E06 will not offer them for new invoices; deleted products disappear. Both are audited.
+7. **Image** uses the same file storage, limits and endpoints pattern as customer logos (`/products/:id/image`), stored as uploaded.
+8. **Roles, page sizes and search** as in E03 (ADMIN and SUPER_ADMIN may do everything; 10/25/50; case-insensitive "contains" over name and HSN code).
+
+---
+
 ## Roadmap-only epics (detailed when reached)
 
 | Epic | Scope in one line | Main data |
 |---|---|---|
-| E04 Products and Units | Product CRUD, unit types, HSN and single GST rate, image upload | `products` (embedded stock) |
 | E05 Stock | Opening stock, stock-in, adjustments, atomic non-negative balance, stock history | `stockMovements`, `products.stock` |
 | E06 Invoicing and GST | Create invoice in one transaction, numbering, GST calculator (intra/inter-state), e-way bill upload, cancel, detail view | `invoices` (embedded items), `invoiceCounters`, `settings` |
 | E07 Dashboard and Activity | Customer/product/invoice counts, top customers, recent activity feed | `activityLogs` + aggregations |

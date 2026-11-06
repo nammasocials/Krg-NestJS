@@ -1140,7 +1140,7 @@ Indexes: `users {username:1}` unique collation `{locale:'en',strength:2}`; `refr
 
 ---
 
-### T029 — Add/edit form with logo  ⬜
+### T029 — Add/edit form with logo  ✅ Done
 
 **Definition:** One form for creating and editing a customer.
 
@@ -1165,9 +1165,20 @@ Indexes: `users {username:1}` unique collation `{locale:'en',strength:2}`; `refr
 
 **Verification:** create with and without a logo, duplicate GSTIN, invalid values, edit, change logo, cancel with unsaved changes.
 
+**Result (as built)**
+- **Files:** new `shared/customer-rules.samples.json` (one list of sample GSTINs, phones, names and cities read by both test suites), `api/src/customers/rules-samples.spec.ts`, and in `web/src/features/customers/`: `customer-form.tsx`, `customer-schema.ts(+test)`, `gstin.ts`, `phone.ts`, `logo-file.ts(+test)`, `logo-picker.tsx`, `map-api-errors.ts(+test)`, `rules-samples.test.ts`, `unsaved-guard.ts(+test)`, `use-unsaved-guard.ts`, `edit-customer.tsx`; pages `app/(app)/customer/new/page.tsx` and `customer/[id]/edit/page.tsx`. Changed: `lib/api/client.ts` (sends `FormData` as is; new `requestBlob` for images, with the same refresh-on-401), `lib/api/customers.ts` (`uploadLogo`, `getLogoBlob`), `api/src/customers/dto/create-customer.dto.ts`. No new packages.
+- **One rule, two copies:** the web form repeats the API's rules (name, city, pincode, phone, GSTIN with state and check character). Both test suites read the same sample file, so the copies cannot drift unnoticed. The sample test found a real gap: names such as “श्री गणेश” were rejected because combining marks were not allowed, so both patterns now accept them (`\p{M}`); the API accepts them too.
+- **Form:** messages show after leaving a field and then update while typing; on submit the first invalid field is focused; GSTIN is upper-cased as typed; the State box is read-only and filled from the first two GSTIN digits; a phone such as “+91 98765-43210” is saved as 10 digits. The button reads “Saving…” and fields are disabled while saving, so a double submit is not possible.
+- **API errors:** `GSTIN_EXISTS` and `VALIDATION_FAILED` messages are placed on their fields and the first is focused (after the fields are enabled again); anything else is an error toast (network and server trouble in plain words).
+- **Logo:** JPEG/PNG/WebP up to 5 MB, checked from the file's first bytes before upload; preview, Change, Remove (and Undo remove on edit). The saved logo is fetched through the API client as an image, because the endpoint needs the access token. The logo is uploaded after the customer is saved; if only that fails, a toast says the customer is saved. In create mode the page then moves to the edit page (the chosen file is not kept, so it must be chosen again); in edit mode the form stays and Save retries.
+- **Edit:** the page loads the customer first (spinner), shows the shared 404 for an unknown id, and an error panel with Retry for other failures. Only changed fields are sent (`PATCH`); with nothing changed Save says “No changes to save.”. Success goes to the list (create) or `/customer/:id` (edit; that page arrives in T030, so it shows the not-found page until then).
+- **Unsaved changes:** while the form is changed, closing or reloading the tab shows the browser's warning, clicking any link in the app asks “Discard changes?” (Keep editing / Discard changes), and Cancel asks the same. The browser's Back button cannot be intercepted by the App Router, so it is not covered.
+- **Verified:** 189 web tests (103 new) and 379 API tests pass; lint, typecheck and production build pass. In the browser against the real API: empty submit (seven messages, Name focused), lower-case GSTIN upper-cased with state shown, wrong check character message, create with a logo (POST then PUT, toast, list), edit loads values and the saved logo, change name and remove the logo (PATCH then DELETE logo), unsaved-changes prompt on a link click, duplicate GSTIN placed on the field with focus, unknown id shows 404, no horizontal scroll at 360 px.
+- **Not verified / deferred:** a logo upload that fails after the customer is saved (covered by reasoning and code, not forced in the browser); a multipart upload through a production deployment's proxy; screen-reader announcements of field errors; the ADMIN role in the browser. In the browser pane used for testing (hidden), the confirm dialog's backdrop stayed on screen after closing, in the list's Delete flow as well; this was not investigated further because it did not appear in earlier verification with the pane visible, so it is worth a look in a normal browser during T030.
+
 ---
 
-### T030 — Customer details page and delete flow  ⬜
+### T030 — Customer details page and delete flow  ✅ Done
 
 **Definition:** Read-only page for one customer with the logo, and the delete action.
 
@@ -1187,5 +1198,221 @@ Indexes: `users {username:1}` unique collation `{locale:'en',strength:2}`; `refr
 **Files (intended)**
 - New: `web/src/features/customers/{customer-details.tsx, customer-logo.tsx}`, `web/src/app/(app)/customer/[id]/page.tsx`
 - Changed: `web/src/features/customers/customer-table.tsx` (links)
+
+**Verification:** the full walk-through above, at 360 and 1440 px.
+
+**Result (as built)**
+- **Files:** new `web/src/features/customers/{customer-details.tsx, customer-logo.tsx, use-customer.ts}` and `web/src/app/(app)/customer/[id]/page.tsx`. `use-customer.ts` is the shared "load one customer" hook (loading, ready, missing, error with Retry, and an old answer is never shown for a new id); the edit page was changed to use it too (`edit-customer.tsx`), and `logo-picker.tsx` now exports its preview helper. `customer-table.tsx` needed no change: its View and Edit links already pointed at these routes.
+- **Page:** logo (or a neutral building icon), name, GSTIN, Edit and Delete buttons, then email (mailto link), phone, alternate phone, state name and code, address, added and last-changed dates. "Back to customers" sits above. Phones are shown as "98765 43210".
+- **Logo:** fetched through the API client with the access token and shown as an image; a spinner while loading; a customer without a logo, a failed fetch or an image that cannot be drawn shows the placeholder.
+- **Delete:** confirm popup (destructive), then the API call, a toast and back to the list; an already-deleted customer (404) shows an info toast and goes back to the list; any other failure shows an error toast and stays, with the button re-enabled. The button shows "Deleting…" and cannot be pressed twice.
+- **Missing id:** an unknown or deleted id shows the shared 404 page; other load failures show a message with Retry.
+- **Whole-epic check (E03-AC10):** API lint, 27 suites / 379 tests (including the e2e suites on the in-memory database); web lint, typecheck, 189 tests and production build pass. In the browser against the mock database: sign in, add a customer with a logo, find it by search, open it (logo drawn, all fields shown), edit the name (back on the details page with the new name and logo), delete it (back on the list; opening its address again shows the 404 page, and the API answered 404). Checked at 1280 px and at 360 px (no horizontal scroll).
+- **Not verified / deferred:** 1440 px (1280 px was used instead); a failed delete (error toast) was not forced in the browser; screen-reader announcements; the ADMIN role in the browser. In the hidden browser pane used for testing, the confirm dialog's dark backdrop stayed on screen after the dialog closed (also in the list's Delete flow), which blocked clicks until the page was reloaded; it should be checked once in a normal visible browser, and fixed in the shared confirm dialog if it repeats.
+
+---
+
+# Epic E04 — Products and Units
+
+*Planned 2026-11-06, not started. File lists are intended files and may be refined when each task starts. Collection rules follow [03-database-design.md](03-database-design.md) §3.4 with the changes in [04-epics.md](04-epics.md) (E04 decisions). All endpoints are under `/api/v1`, need a signed-in user and use the standard `{code,message,data}` envelope. Patterns are reused from E03: the audit service (T026), file storage (T027), list query and paging (T024, T028), form, error mapping and unsaved-changes guard (T029).*
+
+## US12 — Product data and rules
+
+### T031 — `products` schema, migration, unit and GST helpers  ✅ Done (2026-11-06)
+
+**Definition:** The collection, its indexes, and the pure helpers for units, GST rates, HSN codes and money.
+
+**Acceptance criteria**
+- T031-AC1: Mongoose `Product` schema: `name`, `nameLower`, `unit` (`PIECE|PACK`), `unitPrice` (integer paise ≥ 0), `hsnCode`, `gstRate`, `stock { qtyOnHand }` (default 0, integer ≥ 0), `image? { fileId, mime, size }`, `isActive` (default true), `isDeleted`, `deletedAt?`, `legacyId?`, timestamps, `createdBy`, `updatedBy`. `nameLower` is kept in step by the schema.
+- T031-AC2: Migration `…-create-products.mjs`: partial unique `{nameLower:1}` where `isDeleted:false`; `{nameLower:1,_id:1}`; `{createdAt:-1,_id:-1}`; `{isDeleted:1,isActive:1}`; working `down`.
+- T031-AC3: `units.ts`: the unit list with display names, plural names, short names and `baseQty` (piece 1, pack 10); `isUnit(value)`.
+- T031-AC4: `gst-rates.ts`: allowed rates (0, 0.25, 3, 5, 12, 18, 28) and `isGstRate(value)`; `money.ts`: `rupeesToPaise("12.50")` (exact, rejects more than 2 decimals, negatives and non-numbers) and `paiseToRupees`; `hsn.ts`: `isHsn(value)` (4, 6 or 8 digits).
+- T031-AC5: Unit tests for each helper (edge cases: `"0.1"`, `"1e3"`, `"10."`, `" 5 "`, and 0.29-rupee rounding traps) and for the schema (`toJSON` shape: `id`, no `__v`, no `nameLower`; duplicate active name rejected, reusable after soft delete; migration runs twice and rolls back).
+
+**DB collection definition — `products`:** as doc 03 §3.4 (name unique among active, unit enum, `unitPrice` in paise, `hsnCode`, one `gstRate`, embedded `stock.qtyOnHand`, `image`, `isActive`, soft delete, `legacyId`).
+
+**UI flow:** None.  **API flow:** None (data layer only).
+
+**Files (intended)**
+- New: `api/src/products/{product.schema.ts, units.ts, gst-rates.ts, money.ts, hsn.ts, *.spec.ts, products.module.ts}`, `api/migrations/<timestamp>-create-products.mjs`
+- Changed: `api/src/app.module.ts`
+
+**Verification:** run migrations on the mock database and check the indexes; unit tests.
+
+**Result (as built)**
+- **Files:** new `api/src/products/{product.schema.ts, products.module.ts, units.ts, gst-rates.ts, hsn.ts, money.ts, helpers.spec.ts, products-collection.e2e.spec.ts}` and `api/migrations/20261106100000-create-products.mjs`; `ProductsModule` added to `app.module.ts`. No new packages.
+- **Schema:** as the plan, with `stock` and `image` as sub-documents without their own ids. `stock.qtyOnHand` defaults to 0 and must be a whole number ≥ 0; `unitPrice` must be a safe whole number ≥ 0 (a zero price is allowed); `unit` and `gstRate` are checked against the lists; `hsnCode` against the 4/6/8-digit pattern. `toJSON` returns `id` and hides `_id` and `nameLower` (no `__v`). A `validate` hook keeps `nameLower` in step on create and later saves. `unit` and `gstRate` carry an explicit `type` because Nest cannot work out a union type by itself.
+- **Indexes (migration):** `nameLower_unique_active` (unique, partial: `isDeleted:false`), `nameLower_id`, `createdAt_id_desc`, `isDeleted_isActive`. An inactive product still holds its name; only deleting frees it. `down` drops the collection.
+- **Helpers:** `units.ts` (PIECE and PACK with names, plurals, short forms, `baseQty` 1 and 10, and `unitQuantityLabel`: "1 Piece (pc)", "5 Packs (pks)"); `gst-rates.ts` (0, 0.25, 3, 5, 12, 18, 28); `hsn.ts`; `money.ts`: `rupeesToPaise` works on the typed text with no floating-point arithmetic ("0.29" gives 29, not 28.999…), accepts up to 9 whole digits and 2 decimals, refuses negatives, exponents, "10.", ".5", separators and empty text; `paiseToRupees` gives "12.50". A round trip is checked for every amount from 0.00 to 50.00.
+- **Verified:** 431 API tests pass in 29 suites (52 new here: 43 helper cases, 9 collection tests); lint, typecheck and build pass. The collection tests run on the in-memory database with the real migrations: indexes exist with the partial filter; defaults and derived name; every invalid value rejected; every GST slab and a zero price accepted; a second active product with the same name in any letter case gets a duplicate-key error (`11000`); the name is reusable after a soft delete; an inactive product keeps its name; the migration runs twice, rolls back and re-applies. Built app on a persistent mock database: the migration applied on first start and "No pending migrations" on the second.
+- **Not verified:** the migration against a real external MongoDB; old data (E08).
+
+---
+
+### T032 — Create product endpoint  ✅ Done (2026-11-06)
+
+**Definition:** `POST /products` with full validation.
+
+**Acceptance criteria**
+- T032-AC1: Body `{ name, unit, unitPrice, hsnCode, gstRate }`; `unitPrice` is an integer number of paise (the web form converts rupees). Unknown fields, including `stock`, `isActive` and `isDeleted`, are rejected (`400 VALIDATION_FAILED`, all errors listed with field paths as in E03).
+- T032-AC2: Name trimmed, 2–100 characters, letters, digits and common punctuation, starting with a letter or digit; HSN 4, 6 or 8 digits; GST rate from the allowed set; unit from the list.
+- T032-AC3: A second active product with the same name (case-insensitive) gives `409 PRODUCT_NAME_EXISTS` with the usual `data.errors`; concurrent creates leave one product (the unique index decides).
+- T032-AC4: The product is created with `stock.qtyOnHand = 0` and `isActive = true`; one `CREATE` audit row is written in the same transaction; returns `201` with the product.
+- T032-AC5: Tests: valid create, each invalid field, stock/isActive rejected, duplicate name (case-insensitive), parallel creates, audit row, rollback when the audit write fails, `401` without a token.
+
+**DB collection definition:** None new.  **UI flow:** None yet (T037).  **API flow:** `POST /products`.
+
+**Files (intended)**
+- New: `api/src/products/{products.service.ts, products.controller.ts, dto/create-product.dto.ts, products.e2e.spec.ts}`
+- Changed: `api/src/products/products.module.ts`, `api/src/common/http-exception.filter.ts` (only if a new code is needed)
+
+**Verification:** e2e tests; curl against the built app.
+
+**Result (as built)**
+- **Files:** new `api/src/products/{dto/create-product.dto.ts, products.service.ts, products.controller.ts, products.e2e.spec.ts}`; changed `products.module.ts` (now imports the audit module, has the controller and service). No new packages and no change to the error filter (the named code travels in the exception body as for customers).
+- **Endpoint:** `POST /products` → `201` with the product (`id`, name, unit, `unitPrice` in paise, `hsnCode`, `gstRate`, `stock.qtyOnHand: 0`, `isActive: true`, dates, `createdBy`/`updatedBy`; no `_id`, `nameLower` or `__v`). Needs a sign-in; any signed-in user may create.
+- **Rules:** name trimmed, 2–100, letters (any script, including combining marks), digits and `. , & ' ( ) / + % -`, starting with a letter or digit; `unit` `PIECE` or `PACK`; `unitPrice` a whole number 0 to 99,999,999,999 (text, fractions and negatives refused); `hsnCode` trimmed, 4, 6 or 8 digits; `gstRate` a number from the slab list (text refused). `stock`, `isActive`, `isDeleted`, `nameLower`, `createdBy` and any unknown field give `400` ("property stock should not exist"), and all problems are listed at once, each starting with its field name, so the web form can place them.
+- **Duplicates:** the same name in any letter case (and with spaces around it) gives `409 PRODUCT_NAME_EXISTS`, `data.errors: ["name is already used by another product"]`. An early check gives the friendly answer; the unique index decides under parallel requests (six parallel creates: one `201`, five `409`, one product, one audit row). An inactive product keeps its name; a soft-deleted one frees it.
+- **Audit:** one `CREATE` row in the same transaction as the product, with the actor and the request id and the full after-state; a failed audit write leaves no product; a rejected request writes nothing.
+- **Shared code:** the service reuses `Actor` and `isDuplicateKey` from the customers service; if a third module needs them they should move to `common/`.
+- **Verified:** 469 API tests pass in 30 suites (38 new here: valid create and slabs/HSN/units/zero price, name scripts and punctuation, 18 invalid-value cases, 6 refused caller-set fields, duplicates incl. case, inactive and deleted, parallel creates, audit row and rollback, `401`); lint, typecheck and build pass. Built app with curl: valid create `201`, duplicate in different case `409 PRODUCT_NAME_EXISTS`, invalid body `400` with six messages, no token `401`, and the `X-Request-Id` appears in the log.
+- **Not verified:** a real external MongoDB; the ADMIN role specifically (same guard as customers, which was tested).
+
+---
+
+## US13 — Product list, details, edit and delete API
+
+### T033 — List, search, sort and paginate  ✅ Done (2026-11-06)
+
+**Definition:** `GET /products` for the list page.
+
+**Acceptance criteria**
+- T033-AC1: Query `page` (default 1), `pageSize` (10, 25 or 50; default 10), `q`, `sort` (`name|unitPrice|createdAt`, default newest first), `order`, `active` (`true|false|all`, default `all`). Invalid values give `400` with field paths.
+- T033-AC2: `q` is a case-insensitive "contains" over name and HSN code, escaped (so `(`, `.` and `*` are plain text); empty after trimming means no search.
+- T033-AC3: Response `{ items, page, pageSize, total, totalPages }`; items carry `id`, `name`, `unit`, `unitPrice`, `hsnCode`, `gstRate`, `stock.qtyOnHand`, `isActive`, `hasImage` and dates; no deleted products; stable order (ties broken by `_id`).
+- T033-AC4: Tests: paging maths, each sort, search variants including regex characters, active filter, deleted hidden, bad parameters, `401`.
+
+**DB collection definition:** None new.  **UI flow:** None yet (T036).  **API flow:** `GET /products`.
+
+**Files (intended)**
+- New: `api/src/products/dto/list-products.query.ts`, `api/src/products/products-list.e2e.spec.ts`
+- Changed: `products.service.ts`, `products.controller.ts`
+
+**Verification:** e2e tests; curl with 30 seeded products.
+
+**Result (as built)**
+- **Files:** new `api/src/products/dto/list-products.query.ts` and `api/src/products/products-list.e2e.spec.ts`; changed `products.service.ts` (`list`, plus the `ProductListItem` and `ProductPage` types) and `products.controller.ts` (`GET /products`). No new packages.
+- **Query:** `page` (1–100000, default 1), `pageSize` (10, 25 or 50, default 10), `q` (trimmed, up to 100 characters), `sort` (`name`, `-name`, `unitPrice`, `-unitPrice`, `createdAt`, `-createdAt`; default `-createdAt`), `active` (`all` default, `true`, `false`). One deviation from the plan text: direction is a leading `-` in `sort` (as in the customers list) instead of a separate `order` parameter, so the web list code can be reused. Anything else is `400 VALIDATION_FAILED` with the messages ("sort must be one of …"): unknown parameters, a repeated `q`, `active=TRUE` or `1`, `pageSize=100`.
+- **Search:** case-insensitive "contains" over name and HSN code, with regex characters escaped (`.*`, `((`, `[a-z]`, `a|b`, `^Basmati` all match nothing, while "(Deluxe) Soap & Co." finds the product literally). Blank text means no search. It combines with sort, paging and the active filter, and `total` counts only the matches.
+- **Order:** name sorts on the lower-case name; price and date sorts, and every tie, are broken by `_id` in the same direction, so pages never overlap or skip (tested with 12 products sharing a price and a time, on all four non-name sorts, and with a full walk of 23 products).
+- **Response:** `{ items, page, pageSize, total, totalPages }`; each item has `id`, `name`, `unit`, `unitPrice` (paise), `hsnCode`, `gstRate`, `stock.qtyOnHand`, `isActive`, `hasImage`, `createdAt`, `updatedAt` (no image data, no internal fields). Deleted products never appear, whether active or not, in items or totals. A page past the end returns an empty list with the real total.
+- **Verified:** 507 API tests pass in 31 suites (38 new); lint, typecheck and build pass. Built app with curl and 30 products: default page (30 total, 3 pages), page 3, search "item 2" (10 matches), highest price first (Item 30, 7500), bad sort `400`.
+- **Not verified:** performance on very large catalogues (the search is a scan, as decided for customers); a real external MongoDB.
+
+---
+
+### T034 — Get, edit, activate/deactivate and soft-delete  ⬜
+
+**Definition:** The remaining single-product endpoints.
+
+**Acceptance criteria**
+- T034-AC1: `GET /products/:id` returns the product (including `image` info) or `404` for a bad, unknown or deleted id.
+- T034-AC2: `PATCH /products/:id` accepts any subset of `name, unit, unitPrice, hsnCode, gstRate, isActive` with the same rules as create; an empty body gives `400`; `stock` is rejected; a name clash gives `409 PRODUCT_NAME_EXISTS`; a PATCH that changes nothing returns `200`, writes no audit row and leaves `updatedAt` alone.
+- T034-AC3: `DELETE /products/:id` soft-deletes (`isDeleted`, `deletedAt`) and returns `204`; the name can be reused; a second delete gives `404`.
+- T034-AC4: Every change writes one audit row in the same transaction (`UPDATE` with changed fields, `DELETE` with `before`); an `isActive` flip is an `UPDATE`.
+- T034-AC5: Tests for each endpoint, concurrency (parallel deletes give one audit row), rollback, `401`.
+
+**DB collection definition:** None new.  **UI flow:** None yet.  **API flow:** `GET|PATCH|DELETE /products/:id`.
+
+**Files (intended)**
+- New: `api/src/products/dto/update-product.dto.ts`, `api/src/products/products-item.e2e.spec.ts`
+- Changed: `products.service.ts`, `products.controller.ts`
+
+**Verification:** e2e tests; curl walk-through.
+
+---
+
+## US14 — Product image
+
+### T035 — Product image endpoints  ⬜
+
+**Definition:** Upload, replace, download and remove a product's image.
+
+**Acceptance criteria**
+- T035-AC1: `PUT /products/:id/image` (multipart field `file`) stores a JPEG, PNG or WebP up to `MAX_UPLOAD_MB` through the existing storage service (type from the first bytes, not the name or declared type); replacing releases the old file reference; returns the product.
+- T035-AC2: `GET /products/:id/image` streams the file with its stored type and `Cache-Control: private`; `404` when there is none or the product is deleted; `DELETE` removes it (`204`, `404` when none).
+- T035-AC3: Errors as for logos: `413` too large, `415` wrong type, `400` empty or missing file; a failed upload leaves the old image.
+- T035-AC4: Image changes write an audit row (file id and size only, never bytes); the storage code shared with customer logos is reused, not copied (a small shared helper is extracted if needed, with the logo tests still passing).
+- T035-AC5: e2e tests mirroring the logo tests (upload, replace, wrong type by content, too large, empty, delete, deleted product, `401`).
+
+**DB collection definition:** None new (the `image` field and `fileAssets` exist).  **UI flow:** None yet.  **API flow:** `PUT|GET|DELETE /products/:id/image`.
+
+**Files (intended)**
+- New: `api/src/products/{product-image.service.ts, product-image.controller.ts, product-image.e2e.spec.ts}`
+- Changed: `products.module.ts`, possibly a shared helper under `api/src/files/`
+
+**Verification:** e2e tests; upload a real PNG with curl and fetch it back.
+
+---
+
+## US15 — Product screens
+
+### T036 — Products API client and list page  ⬜
+
+**Definition:** `/product` shows the product list.
+
+**Acceptance criteria**
+- T036-AC1: `lib/api/products.ts` typed functions on the existing API client; types in `features/products/product.types.ts`; the list keeps its state in the address bar (`?q=&page=&pageSize=&sort=&active=`) like the customer list.
+- T036-AC2: Title, "Add product" button, debounced search box with clear, active filter, and the list: table from 768 px (name, HSN, unit, price ₹, GST %, stock, status, actions), cards below; no horizontal scroll from 360 px; inactive products marked.
+- T036-AC3: Pagination, page-size selector, "Showing x–y of n"; loading (shared spinner, no layout jump), empty ("No products yet" / "No products match …"), error with Retry; stale answers never overwrite newer ones.
+- T036-AC4: Delete from the list uses the confirm popup, then toast and refresh (or one page back when the last row goes).
+- T036-AC5: Formatting helpers `formatRupees(paise)` and unit labels with unit tests; address parsing tests as for customers.
+
+**DB collection definition:** None.  **UI flow:** Products → search, page, delete.  **API flow:** `GET /products`, `DELETE /products/:id`.
+
+**Files (intended)**
+- New: `web/src/lib/api/products.ts`, `web/src/features/products/{product.types.ts, product-list.tsx, product-table.tsx, product-cards.tsx, list-query.ts(+test), format.ts(+test)}`
+- Changed: `web/src/app/(app)/product/page.tsx`
+
+**Verification:** seed 30 products; search, page, delete; 360, 768 and 1440 px; API stopped for the error state.
+
+---
+
+### T037 — Add/edit form with image and GST preview  ⬜
+
+**Definition:** One form for creating and editing a product.
+
+**Acceptance criteria**
+- T037-AC1: Routes `/product/new` and `/product/[id]/edit` share `ProductForm` (React Hook Form + zod): name, unit (select), unit price (₹, up to 2 decimals), HSN code, GST rate (select), active (edit only), image.
+- T037-AC2: Client rules match the API, with a test that runs both against one shared sample list (as in T029); rupees convert to paise exactly (no floating-point errors), with tests.
+- T037-AC3: A read-only "Price including GST" preview updates while typing (with the CGST/SGST split shown as information); it is never sent.
+- T037-AC4: Messages on blur then while typing; first invalid field focused; API `VALIDATION_FAILED` and `PRODUCT_NAME_EXISTS` placed on the right field; other failures toast; "Saving…" and no double submit.
+- T037-AC5: Image picker (type and size checked before upload, preview, remove; saved with `PUT` after the product is saved; if only the image fails the product stays saved and the user can retry), reusing the logo picker where possible.
+- T037-AC6: Success → toast and list (create) or details (edit); unsaved-changes confirm; the edit page loads the product first and shows the shared 404 when missing.
+
+**DB collection definition:** None.  **UI flow:** Products → Add product → fill → Save → list. Edit → Save → details.  **API flow:** `POST|PATCH|GET /products`, `PUT /products/:id/image`.
+
+**Files (intended)**
+- New: `web/src/features/products/{product-form.tsx, product-schema.ts(+test), money.ts(+test), gst-preview.ts(+test), map-api-errors.ts(+test), edit-product.tsx}`, `shared/product-rules.samples.json`, `api/src/products/rules-samples.spec.ts`, pages `product/new` and `product/[id]/edit`
+- Changed: the image picker made generic if needed
+
+**Verification:** create with and without an image, duplicate name, invalid values, edit, change image, cancel with unsaved changes; 360 px.
+
+---
+
+### T038 — Product details page, delete flow and whole-epic check  ⬜
+
+**Definition:** Read-only page for one product with its image, and the delete action; closes E04.
+
+**Acceptance criteria**
+- T038-AC1: `/product/[id]` shows image (or placeholder), name, unit, price ₹, HSN, GST rate with CGST/SGST split, price including GST, stock on hand (read-only), status, added and last-changed dates; works from 360 px.
+- T038-AC2: The image is loaded with the signed-in request and shows a loading state; missing or broken shows a placeholder.
+- T038-AC3: Back to products, Edit, Delete (confirm popup, toast, return to the list; failure toast and stay); an unknown or deleted id shows the shared 404.
+- T038-AC4: Whole-epic check: lint, typecheck, unit and e2e tests pass; sign in → add with image → search → view → edit → deactivate → delete verified in the browser against the mock database; docs updated; E04 closed.
+
+**DB collection definition:** None.  **UI flow:** List → View → Edit / Delete → list.  **API flow:** `GET /products/:id`, `GET /products/:id/image`, `DELETE /products/:id`.
+
+**Files (intended)**
+- New: `web/src/features/products/{product-details.tsx, product-image.tsx, use-product.ts}`, `web/src/app/(app)/product/[id]/page.tsx`
 
 **Verification:** the full walk-through above, at 360 and 1440 px.

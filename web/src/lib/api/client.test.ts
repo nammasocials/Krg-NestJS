@@ -27,6 +27,32 @@ describe("api client", () => {
     expect(calls[0]).toEqual({ url: "/api/v1/x", auth: "Bearer tok", credentials: "include" });
   });
 
+  it("sends FormData as is, without a JSON content type", async () => {
+    let seen: { body: unknown; type: string | null } | null = null;
+    const { client } = setup((_url, init) => {
+      seen = { body: init.body, type: new Headers(init.headers).get("Content-Type") };
+      return ok(null);
+    });
+    const form = new FormData();
+    form.append("file", new Blob(["x"]));
+    await client.request("/up", { method: "PUT", body: form });
+    expect(seen).toEqual({ body: form, type: null });
+  });
+
+  it("requestBlob returns the bytes, retries after a 401 and raises ApiError on failure", async () => {
+    let n = 0;
+    const { client, calls } = setup((url) => {
+      if (url.endsWith("/auth/refresh")) return tokens("new");
+      if (url.endsWith("/missing")) return fail(404, "NOT_FOUND", "no logo");
+      return ++n === 1 ? fail(401) : new Response("img", { status: 200 });
+    });
+    client.setAccessToken("old");
+    const blob = await client.requestBlob("/logo");
+    expect(await blob.text()).toBe("img");
+    expect(calls.at(-1)?.auth).toBe("Bearer new");
+    await expect(client.requestBlob("/missing")).rejects.toMatchObject({ status: 404, code: "NOT_FOUND" });
+  });
+
   it("on 401 refreshes once and retries once with the new token", async () => {
     let n = 0;
     const { client, calls } = setup((url) => {

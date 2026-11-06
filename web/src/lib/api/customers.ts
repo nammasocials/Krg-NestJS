@@ -9,7 +9,7 @@ import type { ApiClient } from "./client";
 const BASE = "/customers";
 
 /** Typed calls for the customers endpoints, on top of the shared API client (token, refresh, errors). */
-export function createCustomersApi(client: Pick<ApiClient, "request">) {
+export function createCustomersApi(client: Pick<ApiClient, "request" | "requestBlob">) {
   return {
     /** `search` is the query string from `buildApiSearch`, including the leading `?`. */
     list: (search: string, init?: { signal?: AbortSignal }) =>
@@ -19,6 +19,13 @@ export function createCustomersApi(client: Pick<ApiClient, "request">) {
     update: (id: string, changes: CustomerUpdate) =>
       client.request<Customer>(`${BASE}/${id}`, { method: "PATCH", body: changes }),
     remove: (id: string) => client.request<void>(`${BASE}/${id}`, { method: "DELETE" }),
+    uploadLogo: (id: string, file: Blob) => {
+      const form = new FormData();
+      form.append("file", file);
+      return client.request<unknown>(`${BASE}/${id}/logo`, { method: "PUT", body: form });
+    },
+    /** The logo image, or an ApiError with status 404 when the customer has none. */
+    getLogoBlob: (id: string) => client.requestBlob(`${BASE}/${id}/logo`),
     removeLogo: (id: string) => client.request<void>(`${BASE}/${id}/logo`, { method: "DELETE" }),
   };
 }

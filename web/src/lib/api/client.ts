@@ -59,14 +59,16 @@ export function createApiClient(options: ApiClientOptions = {}) {
     const { body, skipRefresh: _skip, headers, ...rest } = opts;
     void _skip;
     const h = new Headers(headers);
-    if (body !== undefined) h.set("Content-Type", "application/json");
+    const isForm = typeof FormData !== "undefined" && body instanceof FormData;
+    // For FormData the browser sets the multipart Content-Type (with its boundary) itself.
+    if (body !== undefined && !isForm) h.set("Content-Type", "application/json");
     if (accessToken) h.set("Authorization", `Bearer ${accessToken}`);
     try {
       return await doFetch(`${baseUrl}${path}`, {
         ...rest,
         headers: h,
         credentials: "include",
-        body: body === undefined ? undefined : JSON.stringify(body),
+        body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
       });
     } catch {
       throw new NetworkError();
@@ -108,7 +110,8 @@ export function createApiClient(options: ApiClientOptions = {}) {
     return refreshing;
   }
 
-  async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
+  /** Sends, and on 401 refreshes once and sends again. Returns the final response, parsed by the caller. */
+  async function sendWithRefresh(path: string, opts: RequestOptions): Promise<Response> {
     const tokenUsed = accessToken;
     let res = await send(path, opts);
     if (res.status === 401 && !opts.skipRefresh) {
@@ -116,16 +119,28 @@ export function createApiClient(options: ApiClientOptions = {}) {
       const renewed = accessToken !== null && accessToken !== tokenUsed ? true : await refresh();
       if (!renewed) {
         options.onSessionLost?.();
-        return parse<T>(res);
+        return res;
       }
       res = await send(path, opts);
       if (res.status === 401) options.onSessionLost?.();
     }
-    return parse<T>(res);
+    return res;
+  }
+
+  async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
+    return parse<T>(await sendWithRefresh(path, opts));
+  }
+
+  /** For binary answers such as the logo image. Errors are raised like `request` does. */
+  async function requestBlob(path: string, opts: RequestOptions = {}): Promise<Blob> {
+    const res = await sendWithRefresh(path, opts);
+    if (!res.ok) return parse<never>(res);
+    return res.blob();
   }
 
   return {
     request,
+    requestBlob,
     refresh,
     setAccessToken(token: string | null) {
       accessToken = token;

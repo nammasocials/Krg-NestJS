@@ -224,7 +224,7 @@ Status legend: ⬜ To Do · 🟦 In Progress · ✅ Done
 
 ## US11 — Customer screens
 
-**Status:** 🟦 In Progress (T028 ✅ · T029 ⬜ · T030 ⬜)
+**Status:** ✅ Done (T028 ✅ · T029 ✅ · T030 ✅)
 **Story:** As a staff member, I want to do all of this from the Customers page on my desktop or phone.
 
 **Covered epic ACs**
@@ -238,5 +238,83 @@ Status legend: ⬜ To Do · 🟦 In Progress · ✅ Done
 | Task | Definition |
 |---|---|
 | T028 ✅ | Customers API client, list page (table/cards, search with debounce, pagination, states). |
-| T029 | Add/edit form (shared), client rules mirroring the API, field errors from the API, logo picker with preview, toasts. |
-| T030 | Details page with logo, edit link, delete with confirm popup, back to list; end-to-end check. |
+| T029 ✅ | Add/edit form (shared), client rules mirroring the API, field errors from the API, logo picker with preview, toasts. |
+| T030 ✅ | Details page with logo, edit link, delete with confirm popup, back to list; end-to-end check. |
+
+---
+
+# Epic E04 — Products and Units
+
+*Planned 2026-11-06. Decisions to confirm are in [04-epics.md](04-epics.md#decisions-proposed-for-e04-confirm-or-change).*
+
+## US12 — Product data and rules
+
+**Status:** ✅ Done (T031 ✅ · T032 ✅)
+**Story:** As a developer, I get the `products` collection and the unit and GST rules, so prices and tax data are clean from the first record.
+
+**Covered epic ACs**
+- E04-AC1 — Collection and indexes by migration
+- E04-AC3 — Validation; duplicate name gives 409; stock cannot be set
+
+**Tasks**
+
+| Task | Definition |
+|---|---|
+| T031 ✅ | `products` Mongoose schema, migration with indexes, unit list and GST-rate list with unit tests. |
+| T032 ✅ | `POST /products` with DTO validation, money and HSN normalisation, duplicate-name `409`, audit row, e2e tests. |
+
+---
+
+## US13 — Product list, details, edit and delete API
+
+**Status:** 🟦 In Progress (T033 ✅ · T034 ⬜)
+**Story:** As a staff member, I can find a product, open it, correct it, deactivate it and remove it, through guarded and audited endpoints.
+
+**Covered epic ACs**
+- E04-AC2 — List with search, sort, pagination; get one
+- E04-AC4 — Soft delete and active/inactive
+- E04-AC6 — Audit rows
+
+**Tasks**
+
+| Task | Definition |
+|---|---|
+| T033 ✅ | `GET /products` with search, sort, page, page size, active filter, total count; deleted products hidden. |
+| T034 | `GET /products/:id`, `PATCH /products/:id` (partial edit incl. `isActive`), `DELETE /products/:id` (soft), all audited. |
+
+---
+
+## US14 — Product image
+
+**Status:** ⬜ To Do (T035 ⬜)
+**Story:** As a staff member, I can give a product a picture, stored safely on disk like customer logos.
+
+**Covered epic ACs**
+- E04-AC5 — Upload, replace, download, remove
+
+**Tasks**
+
+| Task | Definition |
+|---|---|
+| T035 | `PUT/GET/DELETE /products/:id/image` on the shared file storage (content sniffing, 5 MB limit), audited. |
+
+---
+
+## US15 — Product screens
+
+**Status:** ⬜ To Do (T036 ⬜ · T037 ⬜ · T038 ⬜)
+**Story:** As a staff member, I want to do all of this from the Products page on my desktop or phone.
+
+**Covered epic ACs**
+- E04-AC7 — List page
+- E04-AC8 — Add/edit form
+- E04-AC9 — Details page and delete flow
+- E04-AC10 — Tests and end-to-end verification
+
+**Tasks**
+
+| Task | Definition |
+|---|---|
+| T036 | Products API client, list page (table/cards, search, pagination, states, read-only stock). |
+| T037 | Add/edit form (shared), rupee input, GST preview, rules mirroring the API, field errors, image picker. |
+| T038 | Details page with image, edit, delete with confirm; whole-epic check and end-to-end walk-through. |
