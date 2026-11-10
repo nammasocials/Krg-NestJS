@@ -1,14 +1,9 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-  UnsupportedMediaTypeException,
-} from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectConnection, InjectModel } from "@nestjs/mongoose";
 import { type Connection, type Model, Types } from "mongoose";
 import { AuditService } from "../audit/audit.service";
 import { FileAsset } from "../files/file-asset.schema";
-import { sniffImage } from "../files/image-sniff";
+import { checkImageUpload } from "../files/image-upload";
 import { StorageService } from "../files/storage.service";
 import type { ReadStream } from "node:fs";
 import { Customer } from "./customer.schema";
@@ -39,12 +34,9 @@ export class CustomerLogoService {
   /** Stores the image, attaches it and retires the previous logo, all audited. Returns the customer. */
   async put(id: string, file: Express.Multer.File | undefined, actor: Actor) {
     await this.customerService.get(id); // 404 before anything is written to disk
-    if (!file) throw new BadRequestException('Send the image as multipart form data in the field "file".');
-    if (file.size === 0 || file.buffer.length === 0) throw new BadRequestException("The file is empty.");
-    const kind = sniffImage(file.buffer);
-    if (!kind) throw new UnsupportedMediaTypeException("Only JPEG, PNG and WebP images are accepted.");
+    const { kind, buffer } = checkImageUpload(file);
 
-    const stored = await this.storage.save(FOLDER, file.buffer, kind.ext);
+    const stored = await this.storage.save(FOLDER, buffer, kind.ext);
     // Saved on disk but not attached yet: PENDING until the transaction below succeeds.
     const asset = await this.assets.create({
       storageKey: stored.storageKey,

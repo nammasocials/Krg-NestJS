@@ -50,7 +50,7 @@ interface FieldProps {
   className?: string;
 }
 
-function Field({ id, label, error, hint, required, children, className }: FieldProps) {
+export function Field({ id, label, error, hint, required, children, className }: FieldProps) {
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
   const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(" ") || undefined;

@@ -1,6 +1,7 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
-import { IsIn, IsInt, IsNumber, IsString, Length, Matches, Max, Min } from "class-validator";
+import { IsIn, IsInt, IsNumber, IsOptional, IsString, Length, Matches, Max, Min } from "class-validator";
+import { MAX_MOVEMENT_QTY } from "../../stock/movement-rules";
 import { GST_RATES, type GstRate } from "../gst-rates";
 import { HSN_PATTERN } from "../hsn";
 import { UNIT_CODES, type UnitCode } from "../units";
@@ -15,8 +16,9 @@ export const PRODUCT_NAME_PATTERN = /^[\p{L}\p{N}][\p{L}\p{M}\p{N} .,&'()/+%-]*$
 export const MAX_UNIT_PRICE_PAISE = 99_999_999_999;
 
 /**
- * `stock`, `isActive` and `isDeleted` are not accepted: a new product starts with nothing on hand and
- * active, and stock only changes through the stock service (E05).
+ * `stock`, `isActive` and `isDeleted` are not accepted: a new product starts active, and stock only
+ * changes through the stock service. The one way to start with stock is `openingStock`, which the
+ * service records as an `OPENING` movement.
  */
 export class CreateProductDto {
   @ApiProperty({ example: "Basmati Rice 25kg" })
@@ -46,4 +48,11 @@ export class CreateProductDto {
   @IsNumber({}, { message: `gstRate must be one of: ${GST_RATES.join(", ")}` })
   @IsIn(GST_RATES, { message: `gstRate must be one of: ${GST_RATES.join(", ")}` })
   gstRate!: GstRate;
+
+  @ApiPropertyOptional({ example: 25, minimum: 0, maximum: MAX_MOVEMENT_QTY, description: "Pieces on hand when the product is created (default 0)." })
+  @IsOptional()
+  @IsInt({ message: "openingStock must be a whole number of pieces" })
+  @Min(0, { message: "openingStock must not be negative" })
+  @Max(MAX_MOVEMENT_QTY, { message: `openingStock must be at most ${MAX_MOVEMENT_QTY}` })
+  openingStock?: number;
 }

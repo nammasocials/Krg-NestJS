@@ -1,9 +1,12 @@
-import { ConflictException, Injectable } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectConnection, InjectModel } from "@nestjs/mongoose";
-import { type Connection, type Model, type QueryFilter, Types } from "mongoose";
+import { type ClientSession, type Connection, type Model, type QueryFilter, Types } from "mongoose";
 import { AuditService } from "../audit/audit.service";
+import { changedFields, sanitize, type Snapshot } from "../audit/diff";
 import { type Actor, isDuplicateKey } from "../customers/customers.service";
+import { StockService } from "../stock/stock.service";
 import type { CreateProductDto } from "./dto/create-product.dto";
+import type { UpdateProductDto } from "./dto/update-product.dto";
 import type { ListProductsQuery, ProductSort } from "./dto/list-products.query";
 import { Product, type ProductDocument } from "./product.schema";
 
@@ -59,6 +62,7 @@ export class ProductsService {
     @InjectModel(Product.name) private readonly products: Model<Product>,
     @InjectConnection() private readonly connection: Connection,
     private readonly audit: AuditService,
+    private readonly stock: StockService,
   ) {}
 
   async list(query: ListProductsQuery): Promise<ProductPage> {
@@ -112,7 +116,14 @@ export class ProductsService {
     try {
       return await this.connection.transaction(async (session) => {
         // Stock and active state are not taken from the caller: the schema defaults apply (0 on hand, active).
-        const [product] = await this.products.create([{ ...dto, createdBy: by, updatedBy: by }], { session });
+        const { openingStock = 0, ...fields } = dto;
+        const [created] = await this.products.create([{ ...fields, createdBy: by, updatedBy: by }], { session });
+        let product = created;
+        if (openingStock > 0) {
+          // The only way stock changes: through the stock service, in this same transaction.
+          await this.stock.apply(session, { productId: created._id, delta: openingStock, type: "OPENING", actorId: actor.id });
+          product = (await this.products.findById(created._id).session(session)) ?? created;
+        }
         await this.audit.record(
           { entity: ENTITY, entityId: product.id, action: "CREATE", after: product.toJSON(), actorId: actor.id, requestId: actor.requestId },
           session,
@@ -123,5 +134,65 @@ export class ProductsService {
       if (isDuplicateKey(err)) throw productNameExists();
       throw err;
     }
+  }
+
+  /** Throws 404 for an unknown, malformed or deleted product. */
+  async get(id: string, session?: ClientSession): Promise<ProductDocument> {
+    const product = await this.products.findOne({ _id: id, isDeleted: false }).session(session ?? null);
+    if (!product) throw new NotFoundException("Product not found");
+    return product;
+  }
+
+  async update(id: string, dto: UpdateProductDto, actor: Actor): Promise<ProductDocument> {
+    const changes = Object.entries(dto).filter(([, v]) => v !== undefined);
+    if (changes.length === 0) throw new BadRequestException("Send at least one field to change.");
+
+    try {
+      return await this.connection.transaction(async (session) => {
+        const product = await this.get(id, session);
+        if (dto.name && dto.name.toLowerCase() !== product.nameLower) {
+          const clash = await this.products
+            .exists({ nameLower: dto.name.toLowerCase(), isDeleted: false, _id: { $ne: product._id } })
+            .session(session);
+          if (clash) throw productNameExists();
+        }
+
+        const before = product.toJSON();
+        for (const [key, value] of changes) product.set(key, value);
+        await product.validate(); // refreshes the derived nameLower so the comparison is complete
+        const after = product.toJSON();
+        // Saying what is already true is not an edit: no write, no audit row.
+        if (changedFields(sanitize(before) as Snapshot, sanitize(after) as Snapshot).length === 0) return product;
+
+        product.updatedBy = new Types.ObjectId(actor.id);
+        await product.save({ session });
+        await this.audit.record(
+          { entity: ENTITY, entityId: product.id, action: "UPDATE", before, after: product.toJSON(), actorId: actor.id, requestId: actor.requestId },
+          session,
+        );
+        return product;
+      });
+    } catch (err) {
+      if (isDuplicateKey(err)) throw productNameExists();
+      throw err;
+    }
+  }
+
+  async remove(id: string, actor: Actor): Promise<void> {
+    await this.connection.transaction(async (session) => {
+      const product = await this.get(id, session);
+      const before = product.toJSON();
+      // Conditional on isDeleted:false so two parallel deletes cannot both succeed.
+      const res = await this.products.updateOne(
+        { _id: product._id, isDeleted: false },
+        { isDeleted: true, deletedAt: new Date(), updatedBy: new Types.ObjectId(actor.id) },
+        { session },
+      );
+      if (res.matchedCount === 0) throw new NotFoundException("Product not found");
+      await this.audit.record(
+        { entity: ENTITY, entityId: product.id, action: "DELETE", before, actorId: actor.id, requestId: actor.requestId },
+        session,
+      );
+    });
   }
 }

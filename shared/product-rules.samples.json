@@ -1,0 +1,245 @@
+{
+  "_about": "One list of sample values that both the API (api/src/products/rules-samples.spec.ts) and the web form (web/src/features/products/rules-samples.test.ts) are tested against, so their name, HSN, rupee, GST and opening-stock rules cannot drift apart.",
+  "name": [
+    {
+      "value": "Basmati Rice 25kg",
+      "valid": true
+    },
+    {
+      "value": "Blue Star (Deluxe) Soap & Co.",
+      "valid": true
+    },
+    {
+      "value": "Oil 15% off + free/pack, 1-2",
+      "valid": true,
+      "note": "% / + , - . are allowed inside"
+    },
+    {
+      "value": "चावल 5kg",
+      "valid": true,
+      "note": "other scripts, with combining marks"
+    },
+    {
+      "value": "5 Star",
+      "valid": true,
+      "note": "may start with a digit"
+    },
+    {
+      "value": "-Rice",
+      "valid": false,
+      "note": "must start with a letter or digit"
+    },
+    {
+      "value": " Rice",
+      "valid": false,
+      "note": "the pattern itself does not trim; both sides trim first"
+    },
+    {
+      "value": "Rice@Home",
+      "valid": false
+    },
+    {
+      "value": "Rice <b>",
+      "valid": false
+    },
+    {
+      "value": "Rice\nBag",
+      "valid": false
+    },
+    {
+      "value": "",
+      "valid": false
+    }
+  ],
+  "hsn": [
+    {
+      "value": "1006",
+      "valid": true
+    },
+    {
+      "value": "100630",
+      "valid": true
+    },
+    {
+      "value": "10063020",
+      "valid": true
+    },
+    {
+      "value": "100",
+      "valid": false
+    },
+    {
+      "value": "10063",
+      "valid": false
+    },
+    {
+      "value": "1006302",
+      "valid": false
+    },
+    {
+      "value": "100630200",
+      "valid": false
+    },
+    {
+      "value": "10O63020",
+      "valid": false,
+      "note": "letter O"
+    },
+    {
+      "value": "1006 3020",
+      "valid": false
+    },
+    {
+      "value": "",
+      "valid": false
+    }
+  ],
+  "rupees": [
+    {
+      "input": "0",
+      "paise": 0
+    },
+    {
+      "input": "5",
+      "paise": 500
+    },
+    {
+      "input": "0.1",
+      "paise": 10
+    },
+    {
+      "input": "0.29",
+      "paise": 29,
+      "note": "0.29 * 100 is not exact in floating point"
+    },
+    {
+      "input": " 12.50 ",
+      "paise": 1250
+    },
+    {
+      "input": "1250.50",
+      "paise": 125050
+    },
+    {
+      "input": "999999999.99",
+      "paise": 99999999999
+    },
+    {
+      "input": "1000000000",
+      "paise": null,
+      "note": "more than 9 whole-rupee digits"
+    },
+    {
+      "input": "-1",
+      "paise": null
+    },
+    {
+      "input": "1e3",
+      "paise": null
+    },
+    {
+      "input": "10.",
+      "paise": null
+    },
+    {
+      "input": ".5",
+      "paise": null
+    },
+    {
+      "input": "1.234",
+      "paise": null
+    },
+    {
+      "input": "1,000",
+      "paise": null
+    },
+    {
+      "input": "abc",
+      "paise": null
+    },
+    {
+      "input": "",
+      "paise": null
+    }
+  ],
+  "gstRate": [
+    {
+      "value": 0,
+      "valid": true
+    },
+    {
+      "value": 0.25,
+      "valid": true
+    },
+    {
+      "value": 3,
+      "valid": true
+    },
+    {
+      "value": 5,
+      "valid": true
+    },
+    {
+      "value": 12,
+      "valid": true
+    },
+    {
+      "value": 18,
+      "valid": true
+    },
+    {
+      "value": 28,
+      "valid": true
+    },
+    {
+      "value": 7,
+      "valid": false
+    },
+    {
+      "value": 18.5,
+      "valid": false
+    },
+    {
+      "value": -5,
+      "valid": false
+    },
+    {
+      "value": 100,
+      "valid": false
+    }
+  ],
+  "openingStock": [
+    {
+      "value": 0,
+      "valid": true
+    },
+    {
+      "value": 1,
+      "valid": true
+    },
+    {
+      "value": 25,
+      "valid": true
+    },
+    {
+      "value": 1000000,
+      "valid": true
+    },
+    {
+      "value": -1,
+      "valid": false
+    },
+    {
+      "value": 1000001,
+      "valid": false
+    },
+    {
+      "value": 2.5,
+      "valid": false
+    },
+    {
+      "value": 0.5,
+      "valid": false
+    }
+  ]
+}

@@ -12,6 +12,7 @@ import { Env, validateEnv } from "./config/env.schema";
 import { SeedModule } from "./seed/seed.module";
 import { CustomersModule } from "./customers/customers.module";
 import { ProductsModule } from "./products/products.module";
+import { StockModule } from "./stock/stock.module";
 import { UsersModule } from "./users/users.module";
 
 @Module({
@@ -22,6 +23,7 @@ import { UsersModule } from "./users/users.module";
     UsersModule,
     CustomersModule,
     ProductsModule,
+    StockModule,
     AuthModule,
     SeedModule,
     LoggerModule.forRootAsync({

@@ -22,9 +22,9 @@ Status legend: ⬜ To Do · 🟦 In Progress · ✅ Done
 | E01 | Layout | ✅ | Done: US01–US03, T001–T006, T018–T021 (2026-11-05) |
 | E02 | Login and Authentication | ✅ | Done: US04–US07, T007–T017 (2026-11-04) |
 | E03 | Customers | ✅ | Done: US08–US11, T022–T030 (2026-11-06) |
-| E04 | Products and Units | 🟦 | In progress: US12–US15, T031–T038; T031–T033 done |
-| E05 | Stock | ⬜ | Roadmap only |
-| E06 | Invoicing and GST | ⬜ | Roadmap only |
+| E04 | Products and Units | ✅ | Done 2026-11-09: US12–US15, T031–T038 |
+| E05 | Stock | ✅ | Done 2026-11-09: US16 (T039–T041), US17 (T042–T044), US18 (T045–T046) |
+| E06 | Invoicing and GST | 🟦 | Approved: US19 approved (T047–T049); US20–US23 to be detailed |
 | E07 | Dashboard and Activity | ⬜ | Roadmap only |
 | E08 | Hardening, Data Migration and Deployment | ⬜ | Roadmap only |
 
@@ -196,7 +196,7 @@ Let staff manage the customers they invoice: a searchable, paginated list, a det
 
 ## E04 — Products and Units
 
-**Status:** 🟦 In Progress — decisions approved 2026-11-06 (US12 ✅ · US13 🟦 · US14 ⬜ · US15 ⬜)
+**Status:** ✅ Done 2026-11-09 — decisions approved 2026-11-06 (US12 ✅ · US13 ✅ · US14 ✅ · US15 ✅)
 
 **Description**
 Let staff manage the products they sell: a searchable, paginated list, a detail page, add, edit and delete (soft), a product image, unit type (piece or pack), HSN code and one GST rate. Built like E03 (API first, then screens) and reusing its audit service, file storage and list/form patterns. Replaces the old `ProductController`, `ProductService`, the SQL `InvProducts` table and the `InvConstant` unit types, and the Angular `ProductModule` (its stock screens belong to E05).
@@ -221,9 +221,9 @@ Let staff manage the products they sell: a searchable, paginated list, a detail 
 | ID | Title | Covers | Status |
 |---|---|---|---|
 | US12 | Product data and rules | E04-AC1, AC3 | ✅ |
-| US13 | Product list, details, edit and delete API | E04-AC2, AC4, AC6 | 🟦 |
-| US14 | Product image | E04-AC5 | ⬜ |
-| US15 | Product screens | E04-AC7, AC8, AC9, AC10 | ⬜ |
+| US13 | Product list, details, edit and delete API | E04-AC2, AC4, AC6 | ✅ |
+| US14 | Product image | E04-AC5 | ✅ |
+| US15 | Product screens | E04-AC7, AC8, AC9, AC10 | ✅ |
 
 ### Descriptions
 
@@ -252,12 +252,121 @@ Let staff manage the products they sell: a searchable, paginated list, a detail 
 
 ---
 
+## E05 — Stock
+
+**Status:** ✅ Done 2026-11-09 (US16 ✅ · US17 ✅ · US18 ✅)
+
+**Description**
+Make stock trustworthy: every change to a product's quantity goes through one service, never below zero, with an append-only history row that records the balance after the change and, later, the invoice that caused it. Replaces the SQL triggers (`trg_InvProducts_Stock_Quantity`, `trg_InvProducts_InitialStock`, `InvProducts_StockUpdate`) and the `InvProducts_Stock` table; design in doc 03 §3.5 and §5.1.
+
+### Acceptance Criteria (epic level, US16 part)
+
+| ID | Acceptance criterion |
+|---|---|
+| E05-AC1 | The `stockMovements` collection and its indexes exist via a migration; rows are append-only. |
+| E05-AC2 | `StockService.apply()` changes `stock.qtyOnHand` with one atomic conditional update, rejects any change that would go below zero (`409 INSUFFICIENT_STOCK`), and writes a movement with `balanceAfter` in the same transaction. |
+| E05-AC3 | A product created with `openingStock` gets an `OPENING` movement in the same transaction; stock can never be set through create or edit directly. |
+| E05-AC4 | `GET /products/:id/stock-movements` returns the product's history, newest first, paged. |
+| E05-AC5 | `POST /products/:id/stock-in` and `POST /products/:id/stock-adjustments` change stock through `StockService` only, in one transaction with the movement and an audit row; the balance never goes below 0 or above 100,000,000. (US17) |
+| E05-AC6 | `/product/[id]/stock` lets staff add stock or correct it (pieces or packs, reason for adjustments), with a before/after preview and field-level errors, reachable from the product page and list. (US17) |
+| E05-AC7 | The product page shows a "Stock history" section: newest first, paged, with date, kind, signed change, balance after, note and who. (US18) |
+| E05-AC8 | After a stock entry the history is current; the story is verified end to end in the browser and documented. (US18) |
+
+### Stories
+
+| ID | Title | Covers | Status |
+|---|---|---|---|
+| US16 | Stock engine and opening stock | E05-AC1, AC2, AC3, AC4 | ✅ |
+| US17 | Stock-in and adjustment | E05-AC5, AC6 | ✅ Done 2026-11-09 |
+| US18 | Stock history on the product page | E05-AC7, AC8 | ✅ Done 2026-11-09 |
+
+### Tasks (simple list)
+
+- US16: T039 `stockMovements` schema and migration · T040 `StockService.apply()` atomic and non-negative · T041 Opening stock on create and the stock-history endpoint
+- US17: T042 Stock-in and adjustment endpoints · T043 Stock entry screen · T044 Entry points and US17 check
+- US18: T045 Stock history section · T046 Story check and refresh after entries
+
+### Decisions for US17 (approved 2026-11-09)
+
+1. **Two endpoints, not one.** `stock-in` (goods arrive, always positive) and `stock-adjustments` (a correction, either direction). The type is fixed by the endpoint, so a client cannot send `SALE` or `OPENING` by hand; those belong to invoices and product creation.
+2. **The API counts in pieces.** A pack is 10 pieces (E04). The screen lets staff type packs and converts them (×10) before sending, so history and balances are always in one unit.
+3. **Adjustments need a reason** (3 to 200 characters) because they change the count without goods moving; stock-in may have a note (delivery reference). Both show in the history.
+4. **No editing or deleting a movement.** A mistake is corrected with another entry (history is append-only, T039).
+5. **Limits:** one entry up to 1,000,000 pieces (as opening stock); the balance may not exceed 100,000,000 (`409 STOCK_LIMIT_EXCEEDED`), and may never go below 0 (`409 INSUFFICIENT_STOCK`).
+6. **Inactive products can receive stock** (a deactivated product may still be sold down or corrected); deleted ones cannot.
+7. **No separate "double submit" key on the API.** The screen disables the form while saving; two real clicks would be two real entries, which the history shows. If you want protection against repeated sends from retries, say so and an `Idempotency-Key` header is added in T042.
+8. **Roles** as before: ADMIN and SUPER_ADMIN.
+
+### Decisions for US18 (approved 2026-11-09)
+
+1. **On the product page, not a separate screen.** The history sits under the details, so "why is it 47?" is answered where the number is shown.
+2. **Read-only, no filters yet.** Newest first, paged (10/25/50). Filtering by kind or date range is not included; say so if you want it.
+3. **Page and size in the address** (`?hpage=`, `?hsize=`) so a refresh or shared link shows the same rows.
+4. **Shown in pieces** with sign and colour (`+40`, `−3`) and the balance after each change; dates with time in the same format as the rest of the app.
+5. **No API change.** The endpoint from T041 already returns everything needed (including who made the change).
+6. **Sales appear automatically** once invoices exist (E06); until then the "Invoice" cell is plain text, linked to the invoice in E06.
+7. **Roles** as before: ADMIN and SUPER_ADMIN.
+
+---
+
+## E06 — Invoicing and GST
+
+**Status:** 🟦 Approved 2026-11-09 (US19 approved; US20–US23 are detailed and approved one at a time)
+
+**Description**
+Issue GST invoices in one transaction: number, tax, lines and stock together or not at all. Replaces the old three-commit save (`InvoiceService.AddInvoiceAsync`), the GST procs and triggers, and the client-supplied invoice numbers; design in doc 03 §3.6–3.8, §5.2–5.4. Invoices are never edited or deleted: a mistake is cancelled (stock comes back) and issued again.
+
+### Acceptance Criteria (epic level)
+
+| ID | Acceptance criterion |
+|---|---|
+| E06-AC1 | The business profile (name, GSTIN, state, address, logo, invoice footer, invoice prefix) is stored once and editable by staff; its state decides intra- or inter-state supply. (US19) |
+| E06-AC2 | One tax calculator (integer paise, half-up) gives CGST + SGST for same-state and IGST for other-state supply, per line and in total with a whole-rupee round-off; the API and the screen are tested against the same sample file. (US20) |
+| E06-AC3 | `POST /invoices` saves the invoice, takes the next number from `invoiceCounters`, writes `SALE` movements for every line and an audit row in one transaction; a line with too little stock fails the whole invoice with `409 INSUFFICIENT_STOCK` naming the product and nothing is saved. (US20) |
+| E06-AC4 | Invoices can be listed (search, filters, paging), opened with every line, and an optional e-way bill image can be attached and downloaded. (US20) |
+| E06-AC5 | `POST /invoices/:id/cancel` marks the invoice cancelled with a reason, returns every line's stock with `SALE_CANCEL` movements and audits it, once only. (US21) |
+| E06-AC6 | The create-invoice screen picks a customer and products, shows live line and invoice totals with the same tax rules, and shows API refusals on the right line. (US22) |
+| E06-AC7 | The invoice list, the invoice details page and the cancel action are available on screen; the stock history links each sale to its invoice. (US23) |
+
+### Stories
+
+| ID | Title | Covers | Status |
+|---|---|---|---|
+| US19 | Business profile | E06-AC1 | 🟦 Approved |
+| US20 | Tax calculator and invoice engine (API) | E06-AC2, AC3, AC4 | ⬜ (to be detailed) |
+| US21 | Cancel an invoice (API) | E06-AC5 | ⬜ (to be detailed) |
+| US22 | Create-invoice screen | E06-AC6 | ⬜ (to be detailed) |
+| US23 | Invoice list, details and cancel on screen | E06-AC7 | ⬜ (to be detailed) |
+
+### Tasks (simple list)
+
+- US19: T047 Business profile API and migration · T048 Business profile screen · T049 US19 check
+- US20 to US23: numbered and written when each story is planned (about 12 more tasks; the first is the tax calculator).
+
+### Decisions for E06 (approved 2026-11-09)
+
+These answer doc 03 §8 questions 2 to 4; the defaults below are what the design assumed.
+
+1. **Both supply types ship now.** Same state as the business profile gives CGST + SGST; another state gives IGST. A customer's state is taken from the first two digits of their GSTIN (already stored).
+2. **Invoice numbers are generated**, `{prefix}/{financial year}/{0000n}` (for example `KRG/2026-27/00001`), gap-free per financial year (April to March, India time). Staff never type a number. Numbers from the old system are kept as they are by the migration (E08).
+3. **No editing of an issued invoice**: only cancel and issue a new one. A cancelled invoice stays visible and keeps its number.
+4. **A line is counted in the product's own unit** (pieces or packs). Stock is taken in pieces (a pack is 10), so selling 3 packs takes 30 pieces from stock and the `SALE` row says −30.
+5. **Prices come from the product at the time of the sale** and are copied onto the invoice with name, HSN, unit and GST rate; later product edits never change an issued invoice. No per-line price override and no discounts in this phase.
+6. **Only active products and existing (not deleted) customers** can be invoiced. The same product cannot appear on two lines (add to the quantity instead); at most 50 lines per invoice.
+7. **Invoice date** is today (India time) by default and may be set to an earlier date in the same financial year; never a future date.
+8. **Business profile must exist** before the first invoice: without it `POST /invoices` answers `409 BUSINESS_PROFILE_MISSING` and the screen points to the settings page.
+9. **E-way bill** is an optional image (JPEG, PNG or WebP, up to 5 MB) stored with the shared file storage; it can be attached when creating the invoice, and viewed or downloaded later.
+10. **No PDF yet**, as agreed: invoice documents and the "interactive" documents wait until you describe the structure. The details page is the on-screen invoice for now.
+11. **Roles**: ADMIN and SUPER_ADMIN can create and view; cancelling is allowed to both (say if cancelling should be SUPER_ADMIN only).
+12. **Order of work**: profile first (the tax rules need the state), then the engine without screens, then cancel, then the screens, so each step can be checked with curl before any UI.
+
+
+---
+
 ## Roadmap-only epics (detailed when reached)
 
 | Epic | Scope in one line | Main data |
 |---|---|---|
-| E05 Stock | Opening stock, stock-in, adjustments, atomic non-negative balance, stock history | `stockMovements`, `products.stock` |
-| E06 Invoicing and GST | Create invoice in one transaction, numbering, GST calculator (intra/inter-state), e-way bill upload, cancel, detail view | `invoices` (embedded items), `invoiceCounters`, `settings` |
 | E07 Dashboard and Activity | Customer/product/invoice counts, top customers, recent activity feed | `activityLogs` + aggregations |
 | E08 Hardening, Data Migration and Deployment | Audit log interceptor, SQL Server → MongoDB ETL with reconciliation, Docker, CI, secret rotation | `auditLogs`, all |
 

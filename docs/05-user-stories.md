@@ -267,7 +267,7 @@ Status legend: ⬜ To Do · 🟦 In Progress · ✅ Done
 
 ## US13 — Product list, details, edit and delete API
 
-**Status:** 🟦 In Progress (T033 ✅ · T034 ⬜)
+**Status:** ✅ Done (T033 ✅ · T034 ✅)
 **Story:** As a staff member, I can find a product, open it, correct it, deactivate it and remove it, through guarded and audited endpoints.
 
 **Covered epic ACs**
@@ -280,13 +280,13 @@ Status legend: ⬜ To Do · 🟦 In Progress · ✅ Done
 | Task | Definition |
 |---|---|
 | T033 ✅ | `GET /products` with search, sort, page, page size, active filter, total count; deleted products hidden. |
-| T034 | `GET /products/:id`, `PATCH /products/:id` (partial edit incl. `isActive`), `DELETE /products/:id` (soft), all audited. |
+| T034 ✅ | `GET /products/:id`, `PATCH /products/:id` (partial edit incl. `isActive`), `DELETE /products/:id` (soft), all audited. |
 
 ---
 
 ## US14 — Product image
 
-**Status:** ⬜ To Do (T035 ⬜)
+**Status:** ✅ Done (T035 ✅)
 **Story:** As a staff member, I can give a product a picture, stored safely on disk like customer logos.
 
 **Covered epic ACs**
@@ -296,13 +296,13 @@ Status legend: ⬜ To Do · 🟦 In Progress · ✅ Done
 
 | Task | Definition |
 |---|---|
-| T035 | `PUT/GET/DELETE /products/:id/image` on the shared file storage (content sniffing, 5 MB limit), audited. |
+| T035 ✅ | `PUT/GET/DELETE /products/:id/image` on the shared file storage (content sniffing, 5 MB limit), audited. |
 
 ---
 
 ## US15 — Product screens
 
-**Status:** ⬜ To Do (T036 ⬜ · T037 ⬜ · T038 ⬜)
+**Status:** ✅ Done (T036 ✅ · T037 ✅ · T038 ✅)
 **Story:** As a staff member, I want to do all of this from the Products page on my desktop or phone.
 
 **Covered epic ACs**
@@ -315,6 +315,82 @@ Status legend: ⬜ To Do · 🟦 In Progress · ✅ Done
 
 | Task | Definition |
 |---|---|
-| T036 | Products API client, list page (table/cards, search, pagination, states, read-only stock). |
-| T037 | Add/edit form (shared), rupee input, GST preview, rules mirroring the API, field errors, image picker. |
-| T038 | Details page with image, edit, delete with confirm; whole-epic check and end-to-end walk-through. |
+| T036 ✅ | Products API client, list page (table/cards, search, pagination, states, read-only stock). |
+| T037 ✅ | Add/edit form (shared), rupee input, GST preview, rules mirroring the API, field errors, image picker. |
+| T038 ✅ | Details page with image, edit, delete with confirm; whole-epic check and end-to-end walk-through. |
+
+---
+
+## US16 — Stock engine and opening stock (E05)
+
+**Status:** ✅ Done (T039 ✅ · T040 ✅ · T041 ✅)
+**Story:** As the business owner, I want a product's stock to change only through one safe service that never goes below zero and records every change, so the numbers can be trusted by invoices and reports.
+
+**Covered epic ACs**
+- E05-AC1 — `stockMovements` history and migration
+- E05-AC2 — One atomic, non-negative stock service
+- E05-AC3 — Opening stock when a product is created
+- E05-AC4 — Stock history endpoint
+
+**Tasks**
+
+| Task | Definition |
+|---|---|
+| T039 ✅ | `stockMovements` schema, type/sign rules, migration and indexes; append-only. |
+| T040 ✅ | `StockService.apply()`: one conditional update, movement with `balanceAfter`, `INSUFFICIENT_STOCK`, race and rollback tests. |
+| T041 ✅ | `openingStock` on create (`OPENING` movement in the same transaction), `GET /products/:id/stock-movements`, opening-stock box on the form. |
+
+---
+
+## US17 — Stock-in and adjustment (E05)
+
+**Status:** ✅ Done 2026-11-09 (T042 ✅ · T043 ✅ · T044 ✅)
+**Story:** As a staff member, I can add stock when goods arrive and correct the count when it is wrong, from the product page, with every change recorded in the product's history.
+
+**Covered epic ACs**
+- E05-AC5 — Stock-in and adjustment endpoints
+- E05-AC6 — Stock entry screen
+
+**Tasks**
+
+| Task | Definition |
+|---|---|
+| T042 | `POST /products/:id/stock-in` and `POST /products/:id/stock-adjustments` on `StockService`, audited, with a cap on the resulting balance. |
+| T043 | Stock entry screen `/product/[id]/stock`: type, quantity in pieces or packs, note, before/after preview, field errors. |
+| T044 | Entry points (details page and list), stock history unaffected, whole-story check and browser walk-through. |
+
+---
+
+## US18 — Stock history on the product page (E05)
+
+**Status:** ✅ Done 2026-11-09 (T045 ✅ · T046 ✅)
+**Story:** As a staff member, I can see on a product's page every change to its stock, who made it and why, so I can explain why the number is what it is.
+
+**Covered epic ACs**
+- E05-AC7 — Stock history section on the product page
+- E05-AC8 — Story check and documentation
+
+**Tasks**
+
+| Task | Definition |
+|---|---|
+| T045 | "Stock history" section on `/product/[id]`: newest first, paged (10/25/50), date, type, change, balance after, note, who; table from 640 px, cards below; loading, empty and error states. |
+| T046 | Refresh after a stock entry, whole-story browser walk-through (all five movement kinds that exist today) and docs. |
+
+---
+
+## US19 — Business profile (E06)
+
+**Status:** 🟦 Approved 2026-11-09, not started (T047 ⬜ · T048 ⬜ · T049 ⬜)
+**Story:** As a staff member, I can enter our business details once (name, GSTIN, address, logo, invoice footer and prefix) so that invoices know who is selling and whether a sale is same-state or other-state.
+
+**Covered epic ACs**
+- E06-AC1 — Business profile stored once and editable
+
+**Tasks**
+
+| Task | Definition |
+|---|---|
+| T047 | `settings` collection (migration) and `GET`/`PUT /settings/business-profile`: validated, audited, GSTIN-derived state code, logo through the shared file storage. |
+| T048 | Settings screen `/settings/business`: form with logo picker, field errors, unsaved-changes guard, "not set up yet" state, menu entry. |
+| T049 | Whole-story check: tests, build, browser walk-through, docs. |

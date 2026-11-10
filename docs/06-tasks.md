@@ -1311,7 +1311,7 @@ Indexes: `users {username:1}` unique collation `{locale:'en',strength:2}`; `refr
 
 ---
 
-### T034 — Get, edit, activate/deactivate and soft-delete  ⬜
+### T034 — Get, edit, activate/deactivate and soft-delete  ✅ Done (2026-11-09)
 
 **Definition:** The remaining single-product endpoints.
 
@@ -1330,11 +1330,21 @@ Indexes: `users {username:1}` unique collation `{locale:'en',strength:2}`; `refr
 
 **Verification:** e2e tests; curl walk-through.
 
+**Result (as built)**
+- **Files:** new `api/src/products/dto/update-product.dto.ts` and `api/src/products/products-item.e2e.spec.ts`; changed `products.service.ts` (`get`, `update`, `remove`) and `products.controller.ts` (`GET`, `PATCH`, `DELETE /products/:id`, with `ParseObjectIdPipe`). No new packages.
+- **GET:** returns the product (with `image` info when present, inactive products included) and no internal fields (`nameLower`, `_id`). A malformed, unknown or deleted id gives `404`.
+- **PATCH:** `UpdateProductDto` is the create DTO made optional plus `isActive`; the same rules apply. An empty body gives `400 "Send at least one field to change."`; `stock`, `isDeleted`, `image`, `createdBy`, `id` and `nameLower` are rejected as "should not exist". A name used by another live product (any case, active or inactive) gives `409 PRODUCT_NAME_EXISTS`; the product's own name, in any case, is allowed; a name only a deleted product used is free. Stock and image are never touched.
+- **No-op:** a PATCH that says what is already true returns `200`, with no write, no audit row and an unchanged `updatedAt` (compared on the sanitized before/after, as for customers).
+- **DELETE:** soft delete (`isDeleted`, `deletedAt`, `updatedBy`) with a conditional update, so of 5 parallel deletes exactly one gets `204`, four get `404`, and there is one audit row. The name becomes reusable; a second delete is `404`; inactive products can be deleted.
+- **Audit:** `UPDATE` rows carry before, after, changed fields, actor and request id (an `isActive` flip records `["isActive"]`); `DELETE` rows carry `before`. A failed audit write rolls back both the update and the delete; rejected and 404 requests write nothing.
+- **Verified:** 550 API tests pass in 32 suites (43 new); lint, typecheck and build pass. Built app with curl: get, price change, deactivate, `stock` rejected (`400`), empty body (`400`), name clash (`409 PRODUCT_NAME_EXISTS`), delete (`204`), delete again and get deleted (`404`).
+- **Not verified:** a real external MongoDB; the ADMIN role against these routes (covered by the global guard, as for customers).
+
 ---
 
 ## US14 — Product image
 
-### T035 — Product image endpoints  ⬜
+### T035 — Product image endpoints  ✅ Done (2026-11-09)
 
 **Definition:** Upload, replace, download and remove a product's image.
 
@@ -1353,11 +1363,19 @@ Indexes: `users {username:1}` unique collation `{locale:'en',strength:2}`; `refr
 
 **Verification:** e2e tests; upload a real PNG with curl and fetch it back.
 
+**Result (as built)**
+- **Files:** new `api/src/products/{product-image.service.ts, product-image.controller.ts, product-image.e2e.spec.ts}` and the shared helper `api/src/files/image-upload.ts` (`checkImageUpload`: file present, not empty, JPEG/PNG/WebP by content); changed `products.module.ts` (imports `FilesModule`) and `customers/customer-logo.service.ts` (now uses the shared helper; its 27 tests still pass unchanged).
+- **Endpoints:** `PUT /products/:id/image` (multipart field `file`) stores by content hash under `products/`, returns the product; `GET` streams the bytes with the stored type, `Cache-Control: private, no-cache`, `X-Content-Type-Options: nosniff`, an ETag (`304` when it matches); `DELETE` detaches (`204`, `404` when none).
+- **Errors:** `415` for a wrong type (decided by content; SVG, GIF and HTML refused), `413` over `MAX_UPLOAD_MB`, `400` for empty, missing or wrongly named file, `404` for unknown, malformed or deleted products (checked before anything is written to disk), `401` signed out. A failed upload or failed database step leaves the old image; the new asset stays PENDING.
+- **Audit:** every upload, replace and removal writes an `UPDATE` row with `image.fileId/mime/size` only, never bytes; replacing marks the old asset ORPHANED. File names are never used in paths.
+- **Verified:** 17 new tests in `product-image.e2e.spec.ts`; lint and typecheck pass. The curl check with a real PNG was replaced by these tests, which fetch the exact bytes back.
+- **Not verified:** a real external MongoDB; clean-up of orphaned files (a later job, as for logos).
+
 ---
 
 ## US15 — Product screens
 
-### T036 — Products API client and list page  ⬜
+### T036 — Products API client and list page  ✅ Done (2026-11-09)
 
 **Definition:** `/product` shows the product list.
 
@@ -1376,9 +1394,16 @@ Indexes: `users {username:1}` unique collation `{locale:'en',strength:2}`; `refr
 
 **Verification:** seed 30 products; search, page, delete; 360, 768 and 1440 px; API stopped for the error state.
 
+**Result (as built)**
+- **Files:** new `web/src/lib/api/products.ts` (list, get, create, update, remove, uploadImage, getImageBlob, removeImage) and `web/src/features/products/{product.types.ts, format.ts(+test), list-query.ts(+test), row-actions.tsx, status-badge.tsx, product-table.tsx, product-cards.tsx, product-list.tsx}`; changed `app/(app)/product/page.tsx` (list inside Suspense) and `features/customers/search-box.tsx` (optional `placeholder` and `label`, so the products list reuses it). The pagination component and page-size rules are reused from the customer list, not copied.
+- **List:** state lives in the address bar (`?q=&page=&pageSize=&sort=&active=`, only non-default values); odd values fall back to defaults. Title, "Add product", debounced search (name or HSN) with clear, "Show" filter (all, active, inactive) and "Sort by" (six options). Table from 768 px (HSN and Stock join at 1024 px), cards below; inactive rows are greyed and carry an "Inactive" badge, so colour is not the only signal. Price shows as ₹ with Indian grouping (`₹1,250.50`), units as "Piece" and "Pack (10 pieces)", stock as "0 pcs", read-only.
+- **States:** shared spinner without layout jump, "No products yet" with an Add button, "No products match …" with Clear filters, error with Retry; each answer is tied to its request key so an older answer never replaces a newer one; a page past the end jumps to the last page. Delete uses the confirm popup, then a toast, and refreshes (or goes one page back when the last row of a page goes); an already-deleted product shows an info toast.
+- **Verified:** 202 web tests pass (13 new in `format.test.ts` and `list-query.test.ts`); lint, typecheck clean. In the browser with 30 seeded products: sort by price high to low with `pageSize=25` shows Item 30 (₹3,705.05) first, "Showing 1–25 of 30", "Page 1 of 2", no console errors; at 360 px, 25 cards, the table hidden and no horizontal scroll.
+- **Not verified:** the API-stopped error state, delete and the empty states by hand (code mirrors the customer list, which was checked); 768 and 1440 px.
+
 ---
 
-### T037 — Add/edit form with image and GST preview  ⬜
+### T037 — Add/edit form with image and GST preview  ✅ Done (2026-11-09)
 
 **Definition:** One form for creating and editing a product.
 
@@ -1398,9 +1423,19 @@ Indexes: `users {username:1}` unique collation `{locale:'en',strength:2}`; `refr
 
 **Verification:** create with and without an image, duplicate name, invalid values, edit, change image, cancel with unsaved changes; 360 px.
 
+**Result (as built)**
+- **Files:** new `web/src/features/products/{product-form.tsx, edit-product.tsx, use-product.ts, product-schema.ts(+test), money.ts(+test), gst-preview.ts(+test), map-api-errors.ts(+test), rules-samples.test.ts}`, `shared/product-rules.samples.json`, `api/src/products/rules-samples.spec.ts`, pages `product/new` and `product/[id]/edit`. Changed: `customers/logo-picker.tsx` (new `noun` prop, so the same picker serves "logo" and "image"; the preview alt text is now "Logo preview") and `customers/customer-form.tsx` (`Field` is exported and reused). The unsaved-changes guard and image type/size checks are reused from the customer feature.
+- **Form:** one `ProductForm` for create and edit: name, unit (Piece, Pack of 10 pieces), unit price in ₹, HSN code, GST rate (select of the seven allowed rates), "Active" checkbox on edit only, image. Messages show on blur and then update while typing; the first invalid field is focused; "Saving…" and a disabled form prevent double submits. Edit sends only the changed fields (`buildUpdate`); nothing changed shows "No changes to save."
+- **Money:** the price is parsed from text to whole paise with string arithmetic (0.29 gives 29, which floating point gets wrong); more than 2 decimals, negatives, `1e3`, `10.`, commas and over 9 whole-rupee digits are refused, exactly like the API.
+- **GST preview:** "Price including GST" updates while typing, with GST and the CGST/SGST split (odd paise go to SGST); information only, never sent.
+- **Errors:** API `VALIDATION_FAILED` messages are placed on their field by name prefix; `PRODUCT_NAME_EXISTS` goes on Name; other failures toast. If only the image fails, the product stays saved: on create the user lands on the edit page with the image to choose again, on edit "Press Save to try again".
+- **Shared rules:** `shared/product-rules.samples.json` (11 names, 10 HSN codes, 16 rupee inputs, 11 GST rates) is run by both `rules-samples.spec.ts` (API, 48 tests) and `rules-samples.test.ts` (web), so the two sides cannot drift.
+- **Verified:** 268 web tests pass (66 new) and 48 new API sample tests; lint and typecheck clean. In the browser: preview for ₹1250.50 at 18% shows ₹1,475.59 (GST ₹225.09, CGST ₹112.54, SGST ₹112.55); a duplicate name ("item 05") shows "A product with this name already exists." on Name and focuses it; a unique name saves, shows "Added “Walkthrough Rice”" and returns to the list.
+- **Not verified by hand:** the image picker flow in the browser (file chooser cannot be driven here; the same picker was verified for logos, and the upload endpoint is covered by T035 tests), the unsaved-changes prompt on this form, 360 px.
+
 ---
 
-### T038 — Product details page, delete flow and whole-epic check  ⬜
+### T038 — Product details page, delete flow and whole-epic check  ✅ Done (2026-11-09)
 
 **Definition:** Read-only page for one product with its image, and the delete action; closes E04.
 
@@ -1416,3 +1451,313 @@ Indexes: `users {username:1}` unique collation `{locale:'en',strength:2}`; `refr
 - New: `web/src/features/products/{product-details.tsx, product-image.tsx, use-product.ts}`, `web/src/app/(app)/product/[id]/page.tsx`
 
 **Verification:** the full walk-through above, at 360 and 1440 px.
+
+**Result (as built)**
+- **Files:** new `web/src/features/products/{product-details.tsx, product-image.tsx}` and `web/src/app/(app)/product/[id]/page.tsx` (`use-product.ts` came with T037).
+- **Details page:** image (or a package placeholder), name, status badge, unit, price in ₹, HSN code, GST rate with CGST/SGST rates, price including GST with the GST split, stock on hand (read-only, with the note that it changes through stock entries), status, added and last-changed dates. Back to products, Edit, and Delete with the confirm popup, then a toast and a return to the list; a failure toasts and stays; "already deleted" is an info toast. An unknown or deleted id shows the shared 404 page.
+- **Image:** fetched with the signed-in request (spinner while loading); a missing or broken image shows the placeholder; same approach as the customer logo.
+- **Whole-epic check (all green):** API lint, typecheck and 620 tests in 34 suites; web lint, typecheck, 268 tests in 23 files, and `next build` (routes `/product`, `/product/new`, `/product/[id]`, `/product/[id]/edit` built).
+- **Browser walk-through, mock database, 1280 px:** sign in, list 30 seeded products (sort, page size, search), add a product (duplicate name rejected on the Name field, then saved), upload a real PNG (curl, fetched back byte-identical), open the details page (image shown, ₹1,475.59 with GST), edit (price ₹999.90, deactivated; saved image preloaded in the form), delete with confirm, and the deleted product's address shows the 404 page. At 360 px the list shows cards with no horizontal scroll.
+- **Not verified:** the image picker via the file chooser and the unsaved-changes prompt on the product form (not drivable here; covered by the shared, previously verified logo picker and guard); 768 and 1440 px; screen readers; a real external MongoDB.
+
+---
+
+## US16 — Stock engine and opening stock (E05)
+
+### T039 — `stockMovements` collection and migration  ✅ Done (2026-11-09)
+
+**Definition:** The append-only stock history exists, with its schema and indexes.
+
+**Acceptance criteria**
+- T039-AC1: A `StockMovement` Mongoose schema: `productId`, `type` (`OPENING`, `STOCK_IN`, `SALE`, `SALE_CANCEL`, `ADJUSTMENT`), signed integer `quantity` (never 0), `balanceAfter` (≥ 0), optional `invoiceId`, `note` (up to 200 characters), `createdBy`, `createdAt`; no update or delete paths in code.
+- T039-AC2: A migration creates the collection with indexes `{productId:1, createdAt:-1, _id:-1}` and a sparse `{invoiceId:1}`; running it twice changes nothing.
+- T039-AC3: The type/sign rule is one helper with unit tests: `OPENING`, `STOCK_IN` and `SALE_CANCEL` are positive, `SALE` is negative, `ADJUSTMENT` may be either.
+- T039-AC4: Tests prove the indexes exist, a zero or wrongly signed quantity is rejected, and documents cannot be changed through the model.
+
+**DB collection definition:** `stockMovements` as in doc 03 §3.5.  **UI flow:** None.  **API flow:** None.
+
+**Files (intended)**
+- New: `api/src/stock/{stock-movement.schema.ts, movement-rules.ts(+spec), stock.module.ts}`, `api/migrations/<timestamp>-create-stock-movements.mjs`, `api/src/stock/stock-collection.e2e.spec.ts`
+- Changed: `app.module.ts`
+
+**Verification:** e2e test on the mock database; migration run twice.
+
+**Result (as built)**
+- **Files:** new `api/src/stock/{movement-rules.ts(+spec), stock-movement.schema.ts, stock.module.ts, stock-collection.e2e.spec.ts}` and `api/migrations/20261109100000-create-stock-movements.mjs`; changed `app.module.ts` (registers `StockModule`). No new packages.
+- **Schema:** `StockMovement` in the `stockMovements` collection: `productId`, `type` (five types), signed `quantity`, `balanceAfter` (whole number ≥ 0), optional `invoiceId`, `note` (trimmed, up to 200), `createdBy`, `createdAt` only (no `updatedAt`). `toJSON` gives `id` and hides `_id`.
+- **Rules helper:** `movementProblem(type, quantity)` is the single place for the type/sign rule: `OPENING`, `STOCK_IN`, `SALE_CANCEL` positive, `SALE` negative, `ADJUSTMENT` either; zero, fractions, NaN, infinity and more than 1,000,000 are refused (`MAX_MOVEMENT_QTY`, also the limit planned for opening stock). The schema validator uses it, so the model and the future service cannot disagree.
+- **Append-only:** saving a changed existing movement, `updateOne`, `updateMany`, `findOneAndUpdate`, `replaceOne`, `findOneAndReplace`, `deleteOne`, `deleteMany`, `findOneAndDelete` and `doc.deleteOne()` all throw "Stock movements are append-only…". Only inserts work through the model; test clean-up uses the raw collection. (The database-level insert/find-only role in doc 03 §8 is an E08 deployment item.)
+- **Migration:** creates the collection and the indexes `productId_createdAt_id_desc` `{productId:1, createdAt:-1, _id:-1}` and `invoiceId_sparse`; run twice, rolled back, run again in the test with no errors.
+- **Verified:** 22 new tests (14 in `movement-rules.spec.ts`, 8 in `stock-collection.e2e.spec.ts`); API now 642 tests in 36 suites; lint, typecheck and build pass (the build and the test app both run the migrations at start-up).
+- **Not verified:** the migration against a real external MongoDB; the database-level restriction (E08).
+
+---
+
+### T040 — `StockService.apply()`: atomic, non-negative stock  ✅ Done (2026-11-09)
+
+**Definition:** The single place where a product's `stock.qtyOnHand` changes, as designed in doc 03 §5.1.
+
+**Acceptance criteria**
+- T040-AC1: `apply(session, { productId, delta, type, invoiceId?, note?, actorId })` changes the balance with one conditional update (`qtyOnHand >= -delta`), then writes the movement with `balanceAfter` from the updated product, inside the caller's transaction.
+- T040-AC2: A change that would make the balance negative throws `InsufficientStockError` (a `409 INSUFFICIENT_STOCK` with the product name, available and requested quantities); nothing is written.
+- T040-AC3: An unknown or deleted product gives `404`; a quantity of 0, a non-integer, or a sign that does not match the type is refused before the database is touched.
+- T040-AC4: If the movement insert or the surrounding transaction fails, the balance change is rolled back.
+- T040-AC5: Tests: normal in/out, exact-to-zero, one too many, 20 parallel sales racing for 5 units (exactly 5 succeed, balance 0, 5 movements), rollback, and `balanceAfter` equal to the product balance after every step.
+
+**DB collection definition:** None new.  **UI flow:** None.  **API flow:** Internal service (used by T041, E05 stock-in and E06 invoices).
+
+**Files (intended)**
+- New: `api/src/stock/{stock.service.ts, stock.errors.ts, stock.e2e.spec.ts}`
+- Changed: `stock.module.ts`
+
+**Verification:** concurrency test on the mock database.
+
+**Result (as built)**
+- **Files:** new `api/src/stock/{stock.service.ts, stock.errors.ts, stock.e2e.spec.ts}`; changed `stock.module.ts` (now registers the `Product` model itself and provides and exports `StockService`; it does not import `ProductsModule`, so products and later invoices can import `StockModule` without a circle). No new packages.
+- **`apply(session, { productId, delta, type, invoiceId?, note?, actorId })`:** checks the quantity with `movementProblem` first (a `400` before any database call), then one `findOneAndUpdate` on `{ _id, isDeleted: false, stock.qtyOnHand >= -delta }` with `$inc`, which both checks and applies the change, then writes the `stockMovements` row with `balanceAfter` taken from the updated product, in the caller's session. It returns the movement. For additions the condition is always true.
+- **Errors:** not enough stock gives `InsufficientStockError`, a `409` with code `INSUFFICIENT_STOCK`, message "Not enough stock." and `errors: ["<name>: <available> in stock, <requested> requested"]` (also exposes `productName`, `available`, `requested`). An unknown, malformed or deleted product gives `404`. Inactive products can still be changed.
+- **Rollback:** the service never opens its own transaction; everything rolls back with the caller's. Tested: a later step throwing, the movement insert failing, and two products in one transaction where the second is short (the first change is undone too).
+- **Concurrency:** 20 parallel sale transactions for 5 units give exactly 5 successes and 15 `INSUFFICIENT_STOCK`, a final balance of 0 and 5 movements with `balanceAfter` 4, 3, 2, 1, 0; run 4 times in a row without a failure.
+- **Verified:** 12 new tests in `stock.e2e.spec.ts` (normal in/out, exact to zero, one too many, negative adjustments, unknown/deleted, bad quantities with no database call, rollbacks, race, mixed run where `balanceAfter` equals the balance after every step and the history sums to the balance); API now 654 tests in 37 suites; lint, typecheck and build pass.
+- **Not verified:** a real external MongoDB under load (the mock runs a single-node replica set); nothing calls `apply` from an endpoint yet (T041, stock-in and invoices).
+
+---
+
+### T041 — Opening stock on create and the stock-history endpoint  ✅ Done (2026-11-09)
+
+**Definition:** A new product can start with stock, and a product's history can be read.
+
+**Acceptance criteria**
+- T041-AC1: `POST /products` accepts an optional `openingStock` (whole number ≥ 0, default 0, up to 1,000,000); above 0 it is applied through `StockService` as an `OPENING` movement in the same transaction as the product and its audit row. The edit endpoint still rejects any stock field.
+- T041-AC2: `GET /products/:id/stock-movements` returns `{ items, page, pageSize, total, totalPages }`, newest first with a stable order, page sizes 10/25/50; each item has `type`, `quantity`, `balanceAfter`, `invoiceId`, `note`, `createdAt` and who made it; `404` for an unknown or deleted product; `401` when signed out.
+- T041-AC3: The product form (create only) gets an "Opening stock (pieces)" box with the same rule as the API and a shared-samples test; the details page shows the opening quantity through the stock figure.
+- T041-AC4: Tests: create with and without opening stock, rollback when the movement fails (no product left), paging and order of the history, `401`; the form test and a browser check.
+- T041-AC5: Whole-story check: API and web lint, typecheck, tests and build pass; verified in the browser against the mock database.
+
+**DB collection definition:** None new.  **UI flow:** Products → Add product → Opening stock → Save.  **API flow:** `POST /products`, `GET /products/:id/stock-movements`.
+
+**Files (intended)**
+- New: `api/src/stock/{stock-movements.controller.ts, dto/list-movements.query.ts, stock-history.e2e.spec.ts}`
+- Changed: `products.service.ts`, `dto/create-product.dto.ts`, `web/src/features/products/{product-form.tsx, product-schema.ts(+test)}`, `shared/product-rules.samples.json` and both sample tests
+
+**Verification:** e2e tests; browser: add a product with opening stock 25, see "25 pcs" in list and details.
+
+**Result (as built)**
+- **API files:** new `api/src/stock/{stock-history.service.ts, stock-movements.controller.ts, dto/list-movements.query.ts, stock-history.e2e.spec.ts}`; changed `products/dto/create-product.dto.ts` (`openingStock`), `dto/update-product.dto.ts` (omits `openingStock`), `products.service.ts` (calls `StockService`), `products.module.ts` (imports `StockModule`), `stock/stock.module.ts` (controller, history service, `User` model), `products/rules-samples.spec.ts`, `shared/product-rules.samples.json`.
+- **openingStock:** optional whole number 0 to 1,000,000 on `POST /products` (`400` naming `openingStock` otherwise). Above 0, `StockService.apply` writes an `OPENING` movement in the same transaction as the product and its audit row; the CREATE audit row shows the opening balance and the response shows `stock.qtyOnHand`. Left out or 0 writes no movement. `PATCH` rejects `openingStock` and `stock` ("should not exist"). If the stock step or the audit write fails, no product and no movement are left; a duplicate name creates nothing.
+- **History:** `GET /products/:id/stock-movements?page=&pageSize=` (10/25/50, default 10) returns `{ items, page, pageSize, total, totalPages }`, newest first with `_id` breaking ties; each item has `id`, `type`, `quantity`, `balanceAfter`, `invoiceId` and `note` when present, `createdAt` and `createdBy { id, name }` (full name, else username). `404` for an unknown, malformed or deleted product, `400` for bad parameters, `401` signed out.
+- **Web files:** changed `features/products/{product-schema.ts(+test), product-form.tsx, map-api-errors.ts, product.types.ts (StockMovement types)}` and `rules-samples.test.ts`. The add form (create only) has "Opening stock (pieces)": empty means 0, whole numbers up to 10,00,000, message on blur, API errors placed on the field; the edit form has no such box and `buildUpdate` ignores it. The list and details pages already show the quantity, so they show it with no further change.
+- **Shared samples:** `openingStock` (8 values) is checked by the API against the real DTO rules (`validateSync`) and by the web against `isValidOpeningStock`.
+- **Verified:** API 690 tests in 38 suites (36 new in `stock-history.e2e.spec.ts` plus 8 sample cases); web 280 tests (12 new); lint, typecheck and `next build` pass on both. In the browser: a 2.5 opening stock is refused with a message and the field focused; 25 saves and the list shows "25 pcs". curl: the history shows one `OPENING` row (+25, balance 25, "Administrator"), PATCH with `openingStock` gives `400`, `pageSize=5` gives `400`, unknown product `404`, no token `401`.
+- **Not verified:** the history on a real external MongoDB; no screen shows the history yet (US18); 360 px for the new box.
+- **Story check (US16):** the engine, the migration and the opening stock all pass lint, typecheck, tests and build on API and web, and the flow was checked in the browser against the mock database.
+
+---
+
+## US17 — Stock-in and adjustment (E05)
+
+### T042 — Stock-in and adjustment endpoints  ✅ Done (2026-11-09)
+
+**Definition:** The two ways staff change stock by hand, both going through `StockService`.
+
+**Acceptance criteria**
+- T042-AC1: `POST /products/:id/stock-in` with `{ quantity, note? }` (whole pieces, 1 to 1,000,000; note up to 200 characters, trimmed) adds stock as a `STOCK_IN` movement and returns the updated product and the movement.
+- T042-AC2: `POST /products/:id/stock-adjustments` with `{ quantity, note }` (non-zero whole pieces, -1,000,000 to 1,000,000; `note` required, 3 to 200 characters, as the reason) writes an `ADJUSTMENT` movement. A removal larger than the balance gives `409 INSUFFICIENT_STOCK`.
+- T042-AC3: The resulting balance may not exceed 100,000,000 pieces: `StockService` refuses with `409 STOCK_LIMIT_EXCEEDED` (naming the product, the balance and the limit); nothing is written.
+- T042-AC4: Each call runs in one transaction: balance change, movement and one audit row (`UPDATE` on the product, with the stock before and after and the movement id). If any step fails, nothing remains.
+- T042-AC5: `404` for an unknown, malformed or deleted product (inactive products are allowed); `400` naming the field for bad input; unknown fields (such as `type` or `balanceAfter`) are rejected; `401` signed out.
+- T042-AC6: Tests: both endpoints, balance and `balanceAfter`, limits at the edges, `INSUFFICIENT_STOCK`, `STOCK_LIMIT_EXCEEDED`, rollback when the audit write fails, parallel stock-in (20 requests of 1 add exactly 20), the history endpoint showing the new rows with the actor, `401`.
+
+**DB collection definition:** None new.  **UI flow:** None yet.  **API flow:** `POST /products/:id/stock-in`, `POST /products/:id/stock-adjustments`.
+
+**Files (intended)**
+- New: `api/src/stock/{stock-entries.controller.ts, stock-entries.service.ts, dto/stock-in.dto.ts, dto/stock-adjustment.dto.ts, stock-entries.e2e.spec.ts}`
+- Changed: `stock.service.ts` and `stock.errors.ts` (balance limit), `stock.module.ts` (imports `AuditModule`), `movement-rules.ts` (`MAX_BALANCE`)
+
+**Verification:** e2e tests; curl: stock-in 40, adjustment -3, adjustment beyond the balance, history.
+
+**Result (as built)**
+- `POST /products/:id/stock-in` (`{ quantity 1..1,000,000, note? ≤200, trimmed, blank = none }`) and `POST /products/:id/stock-adjustments` (`{ quantity` non-zero, ±1,000,000; `note` required 3..200 }) answer `201 { product, movement }`. Both are served by `StockEntriesController` and `StockEntriesService`, which call `StockService.apply` with type `STOCK_IN` or `ADJUSTMENT`.
+- One transaction per call: balance change, movement and one audit row (`Product`, `UPDATE`, `before { stock.qtyOnHand }`, `after { stock.qtyOnHand, movementId }`, actor and request id). A failing audit write leaves stock, movements and audit unchanged (tested).
+- The limit lives in `StockService`: the conditional update now also requires `qtyOnHand <= 100,000,000 - delta` (`MAX_BALANCE` in `movement-rules.ts`). On a miss it answers `409 STOCK_LIMIT_EXCEEDED` (`"<name>: <balance> in stock, the limit is 100000000"`) or `409 INSUFFICIENT_STOCK`. Exactly the limit is allowed. This also protects future sale cancellations.
+- Unknown fields (`type`, `balanceAfter`, `productId`) give `400`; unknown, malformed and deleted products give `404`; inactive products are accepted; signed out gives `401`. The `Idempotency-Key` header was not added (decision 7).
+- `StockModule` now imports `AuditModule`.
+- Tests: `stock-entries.e2e.spec.ts` (33 cases, including 20 parallel stock-ins adding exactly 20 with balances 1..20, edges, rollback, history with actor). API total: 723 tests / 39 suites; lint and typecheck clean.
+- Not run against a real external MongoDB (mock only), as before. The curl walk-through is part of T044.
+
+---
+
+### T043 — Stock entry screen  ✅ Done (2026-11-09)
+
+**Definition:** `/product/[id]/stock` lets staff add stock or correct it.
+
+**Acceptance criteria**
+- T043-AC1: `lib/api/products.ts` gets `stockIn`, `adjustStock` and `listMovements`; types are shared with the history response.
+- T043-AC2: The page loads the product first (shared 404 when missing) and shows its name, unit and current stock. The form has: kind (Stock in, Increase by adjustment, Decrease by adjustment), quantity, a unit choice (pieces or packs of 10, for products counted in packs), and a note (optional for stock in, required as "Reason" for adjustments).
+- T043-AC3: A live line shows "25 pcs → 65 pcs" (or "Not enough stock" before sending); the same quantity and note rules as the API with a shared-samples test; packs convert to pieces exactly.
+- T043-AC4: Messages on blur then while typing; API `VALIDATION_FAILED`, `INSUFFICIENT_STOCK` and `STOCK_LIMIT_EXCEEDED` are shown on the quantity field; other failures toast; "Saving…" and no double submit; unsaved-changes confirm.
+- T043-AC5: Success → toast and back to the product page, which shows the new stock.
+
+**DB collection definition:** None.  **UI flow:** Product → Update stock → fill → Save → product.  **API flow:** `GET /products/:id`, `POST …/stock-in`, `POST …/stock-adjustments`.
+
+**Files (intended)**
+- New: `web/src/features/products/{stock-entry-form.tsx, stock-entry-schema.ts(+test), stock-entry-page.tsx}`, `web/src/app/(app)/product/[id]/stock/page.tsx`, `shared/stock-rules.samples.json`, `api/src/stock/rules-samples.spec.ts`
+- Changed: `web/src/lib/api/products.ts`, `product.types.ts`
+
+**Verification:** unit tests; browser: stock in 40, remove 3 with a reason, remove too many (error on the field), packs entry; 360 px.
+
+**Result (as built)**
+- `lib/api/products.ts` gained `stockIn`, `adjustStock` and `listMovements`; `product.types.ts` gained `StockEntryResult` (next to the existing `StockMovement` types).
+- `/product/[id]/stock` (`stock-entry-page.tsx` loads the product first, shared 404 and retry; `stock-entry-form.tsx`) has: kind (Stock in, Increase by adjustment, Decrease by adjustment), quantity, "Counted in" (pieces; packs of 10 offered only for products counted in packs) and a note (optional "Note" for stock in, required "Reason" for adjustments).
+- Rules live in `stock-entry-schema.ts`: packs convert to pieces exactly (×10), quantity 1..1,000,000 pieces, reason 3..200, note ≤200, `previewBalance`, `toRequest` (decrease is sent as a negative quantity), `mapStockError`. The live line shows "10 pcs → 50 pcs (40 pcs added)", or "Not enough stock: 50 pcs on hand." / the 10,00,00,000 limit message in red.
+- Messages show after leaving a field, then while typing. `VALIDATION_FAILED`, `INSUFFICIENT_STOCK` and `STOCK_LIMIT_EXCEEDED` appear on the quantity (or note) field; other failures toast; "Saving…" with the form disabled; unsaved-changes confirm on Cancel/leave. Success → toast "Stock of “…” is now 47 pcs" and back to the product page, which loads fresh.
+- Shared rules: `shared/stock-rules.samples.json` is read by `api/src/stock/rules-samples.spec.ts` (against the real DTOs) and `stock-entry-schema.test.ts`, so the two sides cannot drift.
+- Tests: web 329 (24 files), API 753 (40 suites); lint, typecheck and build clean.
+- Browser (mock database, signed in as admin): opening 10; stock in 4 packs with a note → 10 → 50; decrease 100 with no reason → "Enter the reason for the change."; with a reason → "…: 50 in stock, 100 requested" on the quantity field, nothing saved; decrease 3 → 47 shown on the details page. History by curl: ADJUSTMENT −3 (47), STOCK_IN 40 (50), OPENING 10 (10). No horizontal overflow at 360 px.
+- Not checked: the unsaved-changes prompt in the browser (unit-tested hook only), 768/1440 px, keyboard-only use. The entry points (buttons) come in T044.
+
+---
+
+### T044 — Entry points and US17 check  ✅ Done (2026-11-09)
+
+**Definition:** The screen is reachable where staff need it, and the story is verified end to end.
+
+**Acceptance criteria**
+- T044-AC1: The product details page has an "Update stock" button next to Edit; each list row has an "Update stock" action (icon with text from 1024 px, same as the other actions).
+- T044-AC2: The details page's stock figure refreshes after a stock entry (no stale value on return).
+- T044-AC3: Whole-story check: API and web lint, typecheck, tests and build pass; browser walk-through against the mock database: add a product with opening stock 10, stock in 40, adjust -3, try to remove 100 (refused), check the figure in list and details and the history by curl (4 rows, balances 10, 50, 47).
+- T044-AC4: Docs updated (E05 acceptance criteria, Result sections).
+
+**DB collection definition:** None.  **UI flow:** List or details → Update stock.  **API flow:** as T042.
+
+**Files (intended)**
+- Changed: `web/src/features/products/{row-actions.tsx, product-details.tsx}`
+
+**Verification:** the walk-through above at 360 and 1280 px.
+
+**Result (as built)**
+- Details page: an outline "Update stock" button (Boxes icon) between Edit and Delete. List: `RowActions` gained an "Update stock" link (`aria-label="Update stock of <name>"`), shown in both the table and the card list; in the table the words appear from 1024 px, like the other actions.
+- The stock figure is never stale: the details page and the list load their data each time they open, so returning after an entry shows the new number (checked: list and details showed 47 pcs).
+- Whole-story check: web lint, typecheck, 329 tests and build pass; API lint, typecheck and 753 tests pass.
+- Browser walk-through (mock database, admin): added "Walkthrough Rice 25kg" with opening stock 10 through the form; from the list row → Update stock → stock in 40 → details 50 pcs; details → Update stock → decrease 3 with reason → 47 pcs; decrease 100 refused on the quantity field ("47 in stock, 100 requested"), nothing saved. History by curl: 3 rows newest first, ADJUSTMENT −3 (47), STOCK_IN 40 (50), OPENING 10 (10). (The "4 rows" in the plan counted a second stock-in that was not needed.)
+- 360 px: no horizontal overflow, the row's Update stock link is visible and inside the screen. Desktop checked at the browser pane's width, not at exactly 1280 px.
+- Not checked: the unsaved-changes prompt and keyboard-only use in the browser, a real external MongoDB, the ADMIN role (walk-through used the seeded admin).
+
+---
+
+## US18 — Stock history on the product page (E05)
+
+### T045 — Stock history section  ✅ Done (2026-11-09)
+
+**Definition:** The product page lists the product's stock movements from `GET /products/:id/stock-movements` (built in T041; no API change).
+
+**Acceptance criteria**
+- T045-AC1: A "Stock history" section under the details shows, newest first: date and time, kind (Opening stock, Stock in, Sale, Sale cancelled, Adjustment), change (`+40` green, `−3` red, in pieces), balance after, the note (shown as "Reason" text for adjustments) and who made it (name; "—" when unknown).
+- T045-AC2: Paged with the shared `Pagination`; page size 10, 25 or 50 (default 10); the page and size are kept in the address (`?hpage=2&hsize=25`) so a refresh or a shared link shows the same rows, and they do not clash with other parameters.
+- T045-AC3: A table from 640 px, a card list below it; no horizontal page scroll at 360 px; long notes wrap.
+- T045-AC4: States: spinner while loading (the details above stay visible), "No stock changes yet." when empty, an error message with Retry when loading fails; a page past the end falls back to the last page. History failing never hides the product details.
+- T045-AC5: Rows for sales (later, E06) show "Invoice" text for now where `invoiceId` is set; the link to the invoice is added in E06.
+- T045-AC6: Tests: formatting (sign, colour class, kind label, who), query parsing, the section with a mocked client (rows, empty, error and retry, paging).
+
+**DB collection definition:** None.  **UI flow:** Product → scroll to Stock history → page.  **API flow:** `GET /products/:id/stock-movements?page=&pageSize=`.
+
+**Files (intended)**
+- New: `web/src/features/products/{stock-history.tsx, stock-history-format.ts(+test), stock-history-query.ts(+test)}`
+- Changed: `web/src/features/products/product-details.tsx`
+
+**Verification:** unit tests; browser at 360 and desktop width with a product that has more than 10 movements.
+
+**Result (as built)**
+- `stock-history.tsx` adds a "Stock history" section under the details on `/product/[id]` (inside a Suspense boundary, because it reads the address). Newest first; columns Date (with time, "9 Nov 2026, 5:09 pm"), Kind (Opening stock, Stock in, Sale, Sale cancelled, Adjustment), Change (`+40` green, `−3` red, Indian grouping), Balance (pcs), Note / reason, By ("—" when unknown). Rows with an `invoiceId` show "Invoice" in front of the note (link comes in E06).
+- A table from 640 px, a card list below (the card labels the text "Reason" for adjustments, "Note" otherwise). Shared `Pagination` (10/25/50). Page and size are `?hpage=` and `?hsize=` (defaults are left out of the address; other parameters are kept); `stock-history-query.ts` parses them and ignores odd values and the list's own `page`/`pageSize`.
+- States: spinner while the first page loads; while changing page the old rows stay with controls disabled and a small spinner; "No stock changes yet."; error with Retry; a page past the end (`?hpage=9`) moves to the last page. The details above never wait for or hide because of the history. No API change.
+- Tests: `stock-history-format.test.ts` and `stock-history-query.test.ts` (20 tests); web total 349 (26 files); lint, typecheck and build clean.
+- **Not done as planned (T045-AC6):** a test of the section with a mocked client. The web project has no component-testing library (no testing-library or DOM environment), so the section was verified in the browser instead; adding the library is a separate decision.
+- Browser (mock database, admin, product with 15 movements): 10 rows on page 1 (balances 59 down to 50), Next → `?hpage=2` shows 11–15 of 15 ending with Opening stock 10; size 25 → one page, `?hsize=25`; reload on `?hpage=2` shows the same rows; `?hpage=9` fell back to page 2; a product with no movements shows "No stock changes yet."; adjustment reason and delivery note shown; 360 px shows cards, no table and no horizontal overflow; 900 px shows the table without page overflow.
+- Not checked: the error/Retry state in the browser (server not stopped mid-test), keyboard-only use, 1440 px, a real external MongoDB.
+
+---
+
+### T046 — Story check and refresh after entries  ✅ Done (2026-11-09)
+
+**Definition:** The history is current whenever the person looks at it, and the story is verified end to end.
+
+**Acceptance criteria**
+- T046-AC1: After a stock entry the product page shows the new row at the top without a manual reload (the page loads fresh on arrival).
+- T046-AC2: Whole-story check: web lint, typecheck, tests and build pass; browser walk-through against the mock database: a product with opening stock 10, stock in 40, adjustment −3, a refused −100 (no row), then 12 more small entries to get a second page; page through, change the size, reload on page 2, check the balances 10, 50, 47 … match the API by curl.
+- T046-AC3: Docs updated (E05 acceptance criteria, Result sections).
+
+**DB collection definition:** None.  **UI flow:** as T045.  **API flow:** as T045.
+
+**Files (intended):** none expected beyond T045.
+
+**Verification:** the walk-through above at 360 px and desktop width.
+
+**Result (as built)**
+- No code change was needed: the history loads fresh each time the product page opens, so a new entry shows at the top on arrival (T046-AC1).
+- Whole-story check: API lint, typecheck and 753 tests (40 suites) pass; web lint, typecheck, 349 tests (26 files) and build pass.
+- Browser walk-through (mock database, admin): added "Story Check Rice" through the form with opening stock 10 (history: Opening stock +10 → 10 pcs); Update stock → stock in 40 (new top row +40 → 50); Update stock → decrease 3 with reason (−3 → 47); decrease 100 refused on the quantity field ("47 in stock, 100 requested") and the history unchanged; back on the product page the three rows were as before. Then 12 more stock-ins of 1 by curl (15 rows in all): `?hpage=2` after a fresh load showed rows 11–15 (+1 → 49, +1 → 48, −3 → 47, +40 → 50, +10 → 10) and "Showing 11–15 of 15", identical to the API's page 2.
+- The 360 px, size-change, past-the-end and empty-history checks were done in T045 and not repeated.
+- Not checked: error/Retry state in the browser, keyboard-only use, 1440 px, a real external MongoDB, the ADMIN role (walk-through used the seeded admin), a component test of the section (no testing library in the web project).
+
+---
+
+## US19 — Business profile (E06)
+
+### T047 — Business profile API  ⬜
+
+**Definition:** One settings document `_id: "businessProfile"` that the tax rules and invoices read.
+
+**Acceptance criteria**
+- T047-AC1: A migration creates the `settings` collection (no extra index; `_id` is the key).
+- T047-AC2: `GET /settings/business-profile` returns the profile, or `404 BUSINESS_PROFILE_MISSING` when it was never saved.
+- T047-AC3: `PUT /settings/business-profile` with `{ name, gstin, address, invoicePrefix, invoiceFooter? }` creates or replaces it. `name` 2 to 100 characters; `gstin` valid 15-character GSTIN with the same check as customers (`stateCode` is derived from its first two digits and returned, never sent); `address` 5 to 300; `invoicePrefix` 2 to 10 letters or digits, upper-cased (default shown as `KRG` is only a hint); `invoiceFooter` up to 300 characters. Unknown fields rejected with `400` naming the field.
+- T047-AC4: Changing the prefix is allowed and affects only invoices created afterwards.
+- T047-AC5: `PUT/GET/DELETE /settings/business-profile/logo` use the shared image upload (same rules and limits as customer logos).
+- T047-AC6: Each save is one transaction with an audit row (`Setting`, `UPDATE`, or `CREATE` the first time) with before and after; saving what is already saved writes nothing.
+- T047-AC7: `401` signed out. Tests: create, replace, no-op save, validation edges, GSTIN state code, logo upload and removal, audit rows, `404`.
+
+**DB collection definition:** `settings` (doc 03 §3.8).  **UI flow:** None yet.  **API flow:** as above.
+
+**Files (intended)**
+- New: `api/migrations/<date>-create-settings.mjs`, `api/src/settings/{settings.module.ts, business-profile.schema.ts, business-profile.service.ts, business-profile.controller.ts, business-logo.service.ts, dto/save-business-profile.dto.ts, business-profile.e2e.spec.ts}`
+- Changed: `api/src/app.module.ts`; the GSTIN helper is reused from `customers/gstin.ts`
+
+**Verification:** e2e tests; curl: 404, save, read, change prefix, logo.
+
+---
+
+### T048 — Business profile screen  ⬜
+
+**Definition:** `/settings/business` lets staff enter and change the profile.
+
+**Acceptance criteria**
+- T048-AC1: A "Business" entry under a Settings item in the menu opens the page; it loads the profile (shared 404 handling does not apply: a missing profile shows an empty form with "Set up your business details before issuing invoices").
+- T048-AC2: Fields: name, GSTIN (state shown as the person types, from the first two digits), address, invoice prefix, invoice footer, logo (same picker as customers).
+- T048-AC3: Same rules as the API, with a shared samples test; messages on blur then while typing; API field errors shown on the field; "Saving…", no double submit; unsaved-changes confirm; success toast.
+- T048-AC4: Works at 360 px.
+
+**DB collection definition:** None.  **UI flow:** Menu → Settings → Business → Save.  **API flow:** T047.
+
+**Files (intended)**
+- New: `web/src/features/settings/{business-form.tsx, business-schema.ts(+test), business-page.tsx}`, `web/src/app/(app)/settings/business/page.tsx`, `web/src/lib/api/settings.ts`, `shared/business-rules.samples.json`, `api/src/settings/rules-samples.spec.ts`
+- Changed: the navigation items file
+
+**Verification:** unit tests; browser: empty state, save, edit, bad GSTIN, logo; 360 px.
+
+---
+
+### T049 — US19 check  ⬜
+
+**Definition:** The story works end to end and is documented.
+
+**Acceptance criteria**
+- T049-AC1: API and web lint, typecheck, tests and build pass.
+- T049-AC2: Browser walk-through against the mock database: open Business (empty state), save with GSTIN of one state, reload (values and derived state shown), change the prefix, set and remove the logo.
+- T049-AC3: Docs updated (E06 criteria, Result sections).
+
+**DB collection definition:** None.  **UI flow / API flow:** as T047 and T048.
+
+**Files (intended):** none expected.
+
+**Verification:** the walk-through above at 360 px and desktop width.

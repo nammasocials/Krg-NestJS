@@ -1,8 +1,15 @@
 import type { Metadata } from "next";
-import { PagePlaceholder } from "@/components/layout/page-placeholder";
+import { Suspense } from "react";
+import { PageSpinner } from "@/components/ui/shared/spinner";
+import { ProductList } from "@/features/products/product-list";
 
 export const metadata: Metadata = { title: "Products" };
 
 export default function ProductsPage() {
-  return <PagePlaceholder title="Products" />;
+  // The list reads the address bar (?q=&page=&sort=&active=), which needs a Suspense boundary.
+  return (
+    <Suspense fallback={<PageSpinner label="Loading products…" />}>
+      <ProductList />
+    </Suspense>
+  );
 }

@@ -12,13 +12,20 @@ interface SearchBoxProps {
   value: string;
   /** Called 300 ms after typing stops, or at once when the box is cleared. */
   onCommit: (q: string) => void;
+  placeholder?: string;
+  label?: string;
 }
 
 /**
  * A search field that follows the address bar: typing updates the address after a short pause, and
  * Back/Forward (which change the address) update the field.
  */
-export function SearchBox({ value, onCommit }: SearchBoxProps) {
+export function SearchBox({
+  value,
+  onCommit,
+  placeholder = "Name, email, phone, GSTIN",
+  label = "Search customers",
+}: SearchBoxProps) {
   const [draft, setDraft] = useState(value);
   // The last text this box sent up (or took from the address bar). A different `value` means the
   // address changed from outside, e.g. Back, so the field follows it.
@@ -54,8 +61,8 @@ export function SearchBox({ value, onCommit }: SearchBoxProps) {
         value={draft}
         maxLength={MAX_SEARCH_LENGTH}
         onChange={(e) => setDraft(e.target.value)}
-        placeholder="Name, email, phone, GSTIN"
-        aria-label="Search customers"
+        placeholder={placeholder}
+        aria-label={label}
         className="h-10 pr-10 pl-9 [&::-webkit-search-cancel-button]:hidden"
       />
       {draft && (

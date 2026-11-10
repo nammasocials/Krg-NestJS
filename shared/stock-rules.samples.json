@@ -1,0 +1,41 @@
+{
+  "_about": "Sample values that both the API (api/src/stock/rules-samples.spec.ts) and the stock entry screen (web/src/features/products/stock-entry-schema.test.ts) are tested against, so their quantity and note rules cannot drift apart. Quantities are whole pieces.",
+  "stockInQuantity": [
+    { "value": 1, "valid": true },
+    { "value": 40, "valid": true },
+    { "value": 1000000, "valid": true },
+    { "value": 0, "valid": false },
+    { "value": -1, "valid": false },
+    { "value": 1000001, "valid": false },
+    { "value": 1.5, "valid": false }
+  ],
+  "adjustmentQuantity": [
+    { "value": 1, "valid": true },
+    { "value": -3, "valid": true },
+    { "value": 1000000, "valid": true },
+    { "value": -1000000, "valid": true },
+    { "value": 0, "valid": false },
+    { "value": 1000001, "valid": false },
+    { "value": -1000001, "valid": false },
+    { "value": -2.5, "valid": false }
+  ],
+  "stockInNote": [
+    { "value": "", "valid": true },
+    { "value": "   ", "valid": true, "note": "blank counts as no note" },
+    { "value": "Supplier delivery, bill 118", "valid": true },
+    { "value": "a", "valid": true },
+    { "value": "x", "count": 200, "valid": true },
+    { "value": "x", "count": 201, "valid": false },
+    { "value": "  padded  ", "valid": true }
+  ],
+  "reason": [
+    { "value": "", "valid": false },
+    { "value": "   ", "valid": false },
+    { "value": "ab", "valid": false },
+    { "value": "  ab  ", "valid": false, "note": "trimmed before counting" },
+    { "value": "abc", "valid": true },
+    { "value": "Damaged in storage", "valid": true },
+    { "value": "x", "count": 200, "valid": true },
+    { "value": "x", "count": 201, "valid": false }
+  ]
+}

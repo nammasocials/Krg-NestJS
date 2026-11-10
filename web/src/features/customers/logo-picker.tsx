@@ -33,9 +33,11 @@ interface Props {
   change: LogoChange;
   onChange: (change: LogoChange) => void;
   disabled?: boolean;
+  /** What the picture is called on screen; "logo" for customers, "image" for products. */
+  noun?: string;
 }
 
-export function LogoPicker({ saved, loadingSaved = false, change, onChange, disabled = false }: Props) {
+export function LogoPicker({ saved, loadingSaved = false, change, onChange, disabled = false, noun = "logo" }: Props) {
   const inputId = useId();
   const hintId = `${inputId}-hint`;
   const errorId = `${inputId}-error`;
@@ -63,17 +65,17 @@ export function LogoPicker({ saved, loadingSaved = false, change, onChange, disa
 
   return (
     <div>
-      <Label htmlFor={inputId}>Logo (optional)</Label>
+      <Label htmlFor={inputId}>{noun.charAt(0).toUpperCase() + noun.slice(1)} (optional)</Label>
       <div className="mt-2 flex flex-wrap items-center gap-4">
         <div
           className="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-dashed border-gray-300 bg-gray-50 text-gray-400"
           aria-live="polite"
         >
           {loadingSaved ? (
-            <Spinner label="Loading logo…" />
+            <Spinner label={`Loading ${noun}…`} />
           ) : previewUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- a data: address cannot go through next/image
-            <img src={previewUrl} alt="Customer logo preview" className="size-full object-contain" />
+            <img src={previewUrl} alt={`${noun.charAt(0).toUpperCase() + noun.slice(1)} preview`} className="size-full object-contain" />
           ) : (
             <ImagePlus className="size-8" aria-hidden="true" />
           )}
@@ -91,7 +93,7 @@ export function LogoPicker({ saved, loadingSaved = false, change, onChange, disa
           />
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" disabled={disabled} onClick={() => fileInput.current?.click()}>
-              {hasLogo ? "Change logo" : "Choose logo"}
+              {hasLogo ? `Change ${noun}` : `Choose ${noun}`}
             </Button>
             {canRemove && (
               <Button
